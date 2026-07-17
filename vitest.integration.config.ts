@@ -13,5 +13,12 @@ export default defineConfig({
     // Transações reais + retries com backoff — mais lento que testes de função pura.
     testTimeout: 30_000,
     hookTimeout: 30_000,
+    // Arquivos de integração compartilham um único Postgres de teste. Rodar
+    // arquivos em paralelo (padrão do Vitest) soma concorrência real entre
+    // suítes que não têm relação lógica entre si, e o SSI do Postgres
+    // ocasionalmente aborta transações por isso (40001 legítimo, mas
+    // inflado por uma causa que não existe em produção). Sequencial evita
+    // esse ruído sem tocar na política de retry do código de produção.
+    fileParallelism: false,
   },
 });

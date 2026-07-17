@@ -6,7 +6,7 @@ SaaS para clínicas de fisioterapia de pequeno e médio porte que operam **sem r
 
 ## Status
 
-**Repositório de agenda implementado.** Arquitetura aprovada e documentada; schema Drizzle (8 tabelas, incluindo `session_attendees` — uma `session` é a turma, com 1 a `rooms.capacity` pacientes) e o repositório de `scheduling` (`createSession`, `addAttendee`, `rescheduleSession`, `updateAttendeeStatus`) implementados e validados contra Postgres real, com testes de concorrência real. Ver ADR-0015. Nenhuma camada de serviço/orquestração, rota de API, ou os módulos `patients`/`notifications`/`auth`/`jobs` implementados ainda.
+**Agenda + notificações implementados e compostos atomicamente.** Arquitetura aprovada e documentada; schema Drizzle (8 tabelas — uma `session` é a turma, com 1 a `rooms.capacity` pacientes em `session_attendees`; confirmações em `notifications`, vinculadas por `session_attendee`), os repositórios de `scheduling` e `notifications`, e o serviço que os compõe numa única transação (criar sessão + agendar confirmação, ou nenhum dos dois) — tudo validado contra Postgres real, com testes de concorrência real. Ver ADR-0015/0016. Nenhuma rota de API, ou os módulos `patients`/`auth`/`jobs` implementados ainda.
 
 ## Como rodar o projeto
 

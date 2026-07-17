@@ -1,7 +1,7 @@
 import { and, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
-import type { PgColumn, PgTransaction } from "drizzle-orm/pg-core";
+import type { PgColumn } from "drizzle-orm/pg-core";
 import { isValidStatusTransition, type AttendeeStatus } from "@/modules/scheduling/session-state-machine";
-import type { DbClient } from "../client";
+import type { DbClient, Tx } from "../client";
 import { auditLog, patients, rooms, sessionAttendees, sessions } from "../schema";
 import { withSerializableRetry } from "../transaction-retry";
 import {
@@ -24,9 +24,6 @@ export type SessionAttendee = typeof sessionAttendees.$inferSelect;
 /** Status da session em si — `ativa`/`cancelada`. Não confundir com AttendeeStatus (por participante). */
 export type SessionStatus = "ativa" | "cancelada";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Tx = PgTransaction<any, any, any>;
-
 export interface Actor {
   type: "professional" | "patient_reply" | "system";
   professionalId?: string;
@@ -45,6 +42,11 @@ export interface CreateSessionResult {
   attendees: SessionAttendee[];
 }
 
+export interface AddAttendeeResult {
+  session: Session;
+  attendee: SessionAttendee;
+}
+
 export interface RescheduleSessionInput {
   sessionId: string;
   roomId: string;
@@ -52,11 +54,19 @@ export interface RescheduleSessionInput {
   scheduledEnd: Date;
 }
 
+/**
+ * Todo método aceita uma `tx` externa opcional (último parâmetro) para
+ * composição atômica com outros repositórios (ex.: notifications) — ver
+ * ADR-0016. Quando fornecida: o repositório a usa, nunca abre nem finaliza
+ * transação própria, e nunca aplica retry (o chamador que abriu a `tx` é
+ * quem decide a política de retry do conjunto). Quando omitida: comportamento
+ * de sempre — abre a própria transação SERIALIZABLE com retry.
+ */
 export interface SchedulingRepository {
-  createSession(input: CreateSessionInput, actor: Actor): Promise<CreateSessionResult>;
-  addAttendee(sessionId: string, patientId: string, actor: Actor): Promise<SessionAttendee>;
-  rescheduleSession(input: RescheduleSessionInput, actor: Actor): Promise<Session>;
-  updateAttendeeStatus(attendeeId: string, status: AttendeeStatus, actor: Actor): Promise<SessionAttendee>;
+  createSession(input: CreateSessionInput, actor: Actor, tx?: Tx): Promise<CreateSessionResult>;
+  addAttendee(sessionId: string, patientId: string, actor: Actor, tx?: Tx): Promise<AddAttendeeResult>;
+  rescheduleSession(input: RescheduleSessionInput, actor: Actor, tx?: Tx): Promise<Session>;
+  updateAttendeeStatus(attendeeId: string, status: AttendeeStatus, actor: Actor, tx?: Tx): Promise<SessionAttendee>;
 }
 
 /**
@@ -275,9 +285,246 @@ async function cancelAttendeeAndMaybeSession(
   return updated;
 }
 
+async function createSessionCore(
+  tx: Tx,
+  clinicId: string,
+  input: CreateSessionInput,
+  actor: Actor,
+): Promise<CreateSessionResult> {
+  const room = await fetchRoom(tx, clinicId, input.roomId);
+  if (!room) {
+    throw new RoomNotFoundError(input.roomId);
+  }
+
+  const existingPatientIds = await fetchExistingPatientIds(tx, clinicId, input.patientIds);
+  const missing = input.patientIds.filter((id) => !existingPatientIds.has(id));
+  if (missing.length > 0) {
+    throw new PatientNotFoundError(missing);
+  }
+
+  if (input.patientIds.length > room.capacity) {
+    throw new RoomAtCapacityError(input.roomId);
+  }
+
+  if (await hasActiveRoomConflict(tx, clinicId, input.roomId, input.scheduledStart, input.scheduledEnd)) {
+    throw new RoomConflictError(input.roomId);
+  }
+  if (
+    await hasActiveProfessionalConflict(tx, clinicId, input.professionalId, input.scheduledStart, input.scheduledEnd)
+  ) {
+    throw new ProfessionalConflictError(input.professionalId);
+  }
+
+  const [insertedSession] = await tx
+    .insert(sessions)
+    .values({
+      clinicId,
+      professionalId: input.professionalId,
+      roomId: input.roomId,
+      scheduledStart: input.scheduledStart,
+      scheduledEnd: input.scheduledEnd,
+      status: "ativa",
+    })
+    .returning();
+  const session = assertRow(insertedSession, "Insert de session não retornou linha");
+
+  const insertedAttendees = await tx
+    .insert(sessionAttendees)
+    .values(
+      input.patientIds.map((patientId) => ({
+        clinicId,
+        sessionId: session.id,
+        patientId,
+        status: "agendada" as const,
+      })),
+    )
+    .returning();
+
+  await writeAuditLog(tx, clinicId, actor, "session.created", "session", session.id, null, {
+    ...sessionAuditSnapshot(session),
+    patientIds: input.patientIds,
+  });
+
+  return { session, attendees: insertedAttendees };
+}
+
+async function addAttendeeCore(
+  tx: Tx,
+  clinicId: string,
+  sessionId: string,
+  patientId: string,
+  actor: Actor,
+): Promise<AddAttendeeResult> {
+  const session = await fetchSession(tx, clinicId, sessionId);
+  if (!session) {
+    throw new SessionNotFoundError(sessionId);
+  }
+  if (session.status !== "ativa") {
+    throw new SessionNotActiveError(sessionId);
+  }
+
+  const existingPatientIds = await fetchExistingPatientIds(tx, clinicId, [patientId]);
+  if (!existingPatientIds.has(patientId)) {
+    throw new PatientNotFoundError([patientId]);
+  }
+
+  const [existingAttendee] = await tx
+    .select({ id: sessionAttendees.id })
+    .from(sessionAttendees)
+    .where(and(eq(sessionAttendees.sessionId, sessionId), eq(sessionAttendees.patientId, patientId)));
+  if (existingAttendee) {
+    throw new PatientAlreadyAttendingError(sessionId, patientId);
+  }
+
+  const room = await fetchRoom(tx, clinicId, session.roomId);
+  if (!room) {
+    throw new RoomNotFoundError(session.roomId);
+  }
+
+  const activeCount = await countActiveAttendees(tx, clinicId, sessionId);
+  if (activeCount >= room.capacity) {
+    throw new RoomAtCapacityError(session.roomId);
+  }
+
+  const [insertedRow] = await tx
+    .insert(sessionAttendees)
+    .values({ clinicId, sessionId, patientId, status: "agendada" })
+    .returning();
+  const attendee = assertRow(insertedRow, "Insert de participante não retornou linha");
+
+  await writeAuditLog(
+    tx,
+    clinicId,
+    actor,
+    "session_attendee.added",
+    "session_attendee",
+    attendee.id,
+    null,
+    attendeeAuditSnapshot(attendee),
+  );
+
+  return { session, attendee };
+}
+
+async function rescheduleSessionCore(
+  tx: Tx,
+  clinicId: string,
+  input: RescheduleSessionInput,
+  actor: Actor,
+): Promise<Session> {
+  const current = await fetchSession(tx, clinicId, input.sessionId);
+  if (!current) {
+    throw new SessionNotFoundError(input.sessionId);
+  }
+  if (current.status !== "ativa") {
+    throw new SessionNotActiveError(input.sessionId);
+  }
+
+  const room = await fetchRoom(tx, clinicId, input.roomId);
+  if (!room) {
+    throw new RoomNotFoundError(input.roomId);
+  }
+
+  if (
+    await hasActiveRoomConflict(
+      tx,
+      clinicId,
+      input.roomId,
+      input.scheduledStart,
+      input.scheduledEnd,
+      input.sessionId,
+    )
+  ) {
+    throw new RoomConflictError(input.roomId);
+  }
+  if (
+    await hasActiveProfessionalConflict(
+      tx,
+      clinicId,
+      current.professionalId,
+      input.scheduledStart,
+      input.scheduledEnd,
+      input.sessionId,
+    )
+  ) {
+    throw new ProfessionalConflictError(current.professionalId);
+  }
+
+  const [updatedRow] = await tx
+    .update(sessions)
+    .set({
+      roomId: input.roomId,
+      scheduledStart: input.scheduledStart,
+      scheduledEnd: input.scheduledEnd,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(sessions.id, input.sessionId), eq(sessions.clinicId, clinicId)))
+    .returning();
+  const updated = assertRow(updatedRow, "Update de remarcação não retornou linha");
+
+  await writeAuditLog(
+    tx,
+    clinicId,
+    actor,
+    "session.rescheduled",
+    "session",
+    updated.id,
+    sessionAuditSnapshot(current),
+    sessionAuditSnapshot(updated),
+  );
+
+  return updated;
+}
+
+async function updateAttendeeStatusCore(
+  tx: Tx,
+  clinicId: string,
+  attendeeId: string,
+  status: AttendeeStatus,
+  actor: Actor,
+): Promise<SessionAttendee> {
+  const current = await fetchAttendee(tx, clinicId, attendeeId);
+  if (!current) {
+    throw new SessionAttendeeNotFoundError(attendeeId);
+  }
+
+  const currentStatus = current.status as AttendeeStatus;
+  if (!isValidStatusTransition(currentStatus, status)) {
+    throw new InvalidStatusTransitionError(currentStatus, status);
+  }
+
+  if (status === "cancelada") {
+    return cancelAttendeeAndMaybeSession(tx, clinicId, actor, current);
+  }
+
+  const [updatedRow] = await tx
+    .update(sessionAttendees)
+    .set({
+      status,
+      confirmedAt: status === "confirmada" ? new Date() : current.confirmedAt,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(sessionAttendees.id, attendeeId), eq(sessionAttendees.clinicId, clinicId)))
+    .returning();
+  const updated = assertRow(updatedRow, "Update de status de participante não retornou linha");
+
+  await writeAuditLog(
+    tx,
+    clinicId,
+    actor,
+    "session_attendee.status_changed",
+    "session_attendee",
+    updated.id,
+    attendeeAuditSnapshot(current),
+    attendeeAuditSnapshot(updated),
+  );
+
+  return updated;
+}
+
 export function createSchedulingRepository(db: DbClient, clinicId: string): SchedulingRepository {
   return {
-    async createSession(input, actor) {
+    async createSession(input, actor, externalTx) {
       if (input.patientIds.length === 0) {
         throw new NoPatientsProvidedError();
       }
@@ -286,251 +533,44 @@ export function createSchedulingRepository(db: DbClient, clinicId: string): Sche
         throw new DuplicatePatientIdsError(duplicates);
       }
 
+      if (externalTx) {
+        return createSessionCore(externalTx, clinicId, input, actor);
+      }
       return withSerializableRetry(() =>
-        db.transaction(
-          async (tx) => {
-            const room = await fetchRoom(tx, clinicId, input.roomId);
-            if (!room) {
-              throw new RoomNotFoundError(input.roomId);
-            }
-
-            const existingPatientIds = await fetchExistingPatientIds(tx, clinicId, input.patientIds);
-            const missing = input.patientIds.filter((id) => !existingPatientIds.has(id));
-            if (missing.length > 0) {
-              throw new PatientNotFoundError(missing);
-            }
-
-            if (input.patientIds.length > room.capacity) {
-              throw new RoomAtCapacityError(input.roomId);
-            }
-
-            if (await hasActiveRoomConflict(tx, clinicId, input.roomId, input.scheduledStart, input.scheduledEnd)) {
-              throw new RoomConflictError(input.roomId);
-            }
-            if (
-              await hasActiveProfessionalConflict(
-                tx,
-                clinicId,
-                input.professionalId,
-                input.scheduledStart,
-                input.scheduledEnd,
-              )
-            ) {
-              throw new ProfessionalConflictError(input.professionalId);
-            }
-
-            const [insertedSession] = await tx
-              .insert(sessions)
-              .values({
-                clinicId,
-                professionalId: input.professionalId,
-                roomId: input.roomId,
-                scheduledStart: input.scheduledStart,
-                scheduledEnd: input.scheduledEnd,
-                status: "ativa",
-              })
-              .returning();
-            const session = assertRow(insertedSession, "Insert de session não retornou linha");
-
-            const insertedAttendees = await tx
-              .insert(sessionAttendees)
-              .values(
-                input.patientIds.map((patientId) => ({
-                  clinicId,
-                  sessionId: session.id,
-                  patientId,
-                  status: "agendada" as const,
-                })),
-              )
-              .returning();
-
-            await writeAuditLog(tx, clinicId, actor, "session.created", "session", session.id, null, {
-              ...sessionAuditSnapshot(session),
-              patientIds: input.patientIds,
-            });
-
-            return { session, attendees: insertedAttendees };
-          },
-          { isolationLevel: "serializable" },
-        ),
+        db.transaction((tx) => createSessionCore(tx, clinicId, input, actor), { isolationLevel: "serializable" }),
       );
     },
 
-    addAttendee(sessionId, patientId, actor) {
+    async addAttendee(sessionId, patientId, actor, externalTx) {
+      if (externalTx) {
+        return addAttendeeCore(externalTx, clinicId, sessionId, patientId, actor);
+      }
       return withSerializableRetry(() =>
-        db.transaction(
-          async (tx) => {
-            const session = await fetchSession(tx, clinicId, sessionId);
-            if (!session) {
-              throw new SessionNotFoundError(sessionId);
-            }
-            if (session.status !== "ativa") {
-              throw new SessionNotActiveError(sessionId);
-            }
-
-            const existingPatientIds = await fetchExistingPatientIds(tx, clinicId, [patientId]);
-            if (!existingPatientIds.has(patientId)) {
-              throw new PatientNotFoundError([patientId]);
-            }
-
-            const [existingAttendee] = await tx
-              .select({ id: sessionAttendees.id })
-              .from(sessionAttendees)
-              .where(and(eq(sessionAttendees.sessionId, sessionId), eq(sessionAttendees.patientId, patientId)));
-            if (existingAttendee) {
-              throw new PatientAlreadyAttendingError(sessionId, patientId);
-            }
-
-            const room = await fetchRoom(tx, clinicId, session.roomId);
-            if (!room) {
-              throw new RoomNotFoundError(session.roomId);
-            }
-
-            const activeCount = await countActiveAttendees(tx, clinicId, sessionId);
-            if (activeCount >= room.capacity) {
-              throw new RoomAtCapacityError(session.roomId);
-            }
-
-            const [insertedRow] = await tx
-              .insert(sessionAttendees)
-              .values({ clinicId, sessionId, patientId, status: "agendada" })
-              .returning();
-            const attendee = assertRow(insertedRow, "Insert de participante não retornou linha");
-
-            await writeAuditLog(
-              tx,
-              clinicId,
-              actor,
-              "session_attendee.added",
-              "session_attendee",
-              attendee.id,
-              null,
-              attendeeAuditSnapshot(attendee),
-            );
-
-            return attendee;
-          },
-          { isolationLevel: "serializable" },
-        ),
+        db.transaction((tx) => addAttendeeCore(tx, clinicId, sessionId, patientId, actor), {
+          isolationLevel: "serializable",
+        }),
       );
     },
 
-    rescheduleSession(input, actor) {
+    async rescheduleSession(input, actor, externalTx) {
+      if (externalTx) {
+        return rescheduleSessionCore(externalTx, clinicId, input, actor);
+      }
       return withSerializableRetry(() =>
-        db.transaction(
-          async (tx) => {
-            const current = await fetchSession(tx, clinicId, input.sessionId);
-            if (!current) {
-              throw new SessionNotFoundError(input.sessionId);
-            }
-            if (current.status !== "ativa") {
-              throw new SessionNotActiveError(input.sessionId);
-            }
-
-            const room = await fetchRoom(tx, clinicId, input.roomId);
-            if (!room) {
-              throw new RoomNotFoundError(input.roomId);
-            }
-
-            if (
-              await hasActiveRoomConflict(
-                tx,
-                clinicId,
-                input.roomId,
-                input.scheduledStart,
-                input.scheduledEnd,
-                input.sessionId,
-              )
-            ) {
-              throw new RoomConflictError(input.roomId);
-            }
-            if (
-              await hasActiveProfessionalConflict(
-                tx,
-                clinicId,
-                current.professionalId,
-                input.scheduledStart,
-                input.scheduledEnd,
-                input.sessionId,
-              )
-            ) {
-              throw new ProfessionalConflictError(current.professionalId);
-            }
-
-            const [updatedRow] = await tx
-              .update(sessions)
-              .set({
-                roomId: input.roomId,
-                scheduledStart: input.scheduledStart,
-                scheduledEnd: input.scheduledEnd,
-                updatedAt: new Date(),
-              })
-              .where(and(eq(sessions.id, input.sessionId), eq(sessions.clinicId, clinicId)))
-              .returning();
-            const updated = assertRow(updatedRow, "Update de remarcação não retornou linha");
-
-            await writeAuditLog(
-              tx,
-              clinicId,
-              actor,
-              "session.rescheduled",
-              "session",
-              updated.id,
-              sessionAuditSnapshot(current),
-              sessionAuditSnapshot(updated),
-            );
-
-            return updated;
-          },
-          { isolationLevel: "serializable" },
-        ),
+        db.transaction((tx) => rescheduleSessionCore(tx, clinicId, input, actor), {
+          isolationLevel: "serializable",
+        }),
       );
     },
 
-    updateAttendeeStatus(attendeeId, status, actor) {
+    async updateAttendeeStatus(attendeeId, status, actor, externalTx) {
+      if (externalTx) {
+        return updateAttendeeStatusCore(externalTx, clinicId, attendeeId, status, actor);
+      }
       return withSerializableRetry(() =>
-        db.transaction(
-          async (tx) => {
-            const current = await fetchAttendee(tx, clinicId, attendeeId);
-            if (!current) {
-              throw new SessionAttendeeNotFoundError(attendeeId);
-            }
-
-            const currentStatus = current.status as AttendeeStatus;
-            if (!isValidStatusTransition(currentStatus, status)) {
-              throw new InvalidStatusTransitionError(currentStatus, status);
-            }
-
-            if (status === "cancelada") {
-              return cancelAttendeeAndMaybeSession(tx, clinicId, actor, current);
-            }
-
-            const [updatedRow] = await tx
-              .update(sessionAttendees)
-              .set({
-                status,
-                confirmedAt: status === "confirmada" ? new Date() : current.confirmedAt,
-                updatedAt: new Date(),
-              })
-              .where(and(eq(sessionAttendees.id, attendeeId), eq(sessionAttendees.clinicId, clinicId)))
-              .returning();
-            const updated = assertRow(updatedRow, "Update de status de participante não retornou linha");
-
-            await writeAuditLog(
-              tx,
-              clinicId,
-              actor,
-              "session_attendee.status_changed",
-              "session_attendee",
-              updated.id,
-              attendeeAuditSnapshot(current),
-              attendeeAuditSnapshot(updated),
-            );
-
-            return updated;
-          },
-          { isolationLevel: "serializable" },
-        ),
+        db.transaction((tx) => updateAttendeeStatusCore(tx, clinicId, attendeeId, status, actor), {
+          isolationLevel: "serializable",
+        }),
       );
     },
   };

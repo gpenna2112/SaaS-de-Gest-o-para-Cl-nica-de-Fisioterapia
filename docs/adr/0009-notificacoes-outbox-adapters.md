@@ -1,6 +1,6 @@
 # ADR-0009 — Notificações: outbox persistido + adapters de canal
 
-- **Status:** Aceito
+- **Status:** Aceito · schema, vínculo por `session_attendee`, idempotência e atomicidade com `scheduling` detalhados no [ADR-0016](0016-notifications-outbox-session-attendee.md)
 - **Data:** 2026-07-17
 
 ## Contexto
