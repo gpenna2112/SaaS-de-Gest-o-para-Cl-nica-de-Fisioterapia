@@ -9,6 +9,7 @@ import {
   InvalidStatusTransitionError,
   NoPatientsProvidedError,
   PatientAlreadyAttendingError,
+  PatientInactiveError,
   PatientNotFoundError,
   ProfessionalConflictError,
   RoomAtCapacityError,
@@ -136,12 +137,29 @@ async function fetchAttendee(tx: Tx, clinicId: string, attendeeId: string) {
   return attendee;
 }
 
-async function fetchExistingPatientIds(tx: Tx, clinicId: string, patientIds: string[]): Promise<Set<string>> {
+/**
+ * Mapa id → ativo para os patientIds encontrados nesta clínica. Um id
+ * ausente do mapa não existe; presente com `false` existe mas está
+ * desativado — paciente inativo não pode ser agendado (decisão de produto,
+ * ver modules/patients/README.md).
+ */
+async function fetchPatientActiveStatus(tx: Tx, clinicId: string, patientIds: string[]): Promise<Map<string, boolean>> {
   const rows = await tx
-    .select({ id: patients.id })
+    .select({ id: patients.id, active: patients.active })
     .from(patients)
     .where(and(eq(patients.clinicId, clinicId), inArray(patients.id, patientIds)));
-  return new Set(rows.map((row) => row.id));
+  return new Map(rows.map((row) => [row.id, row.active]));
+}
+
+function assertPatientsBookable(patientIds: string[], statusById: Map<string, boolean>): void {
+  const missing = patientIds.filter((id) => !statusById.has(id));
+  if (missing.length > 0) {
+    throw new PatientNotFoundError(missing);
+  }
+  const inactive = patientIds.filter((id) => statusById.get(id) === false);
+  if (inactive.length > 0) {
+    throw new PatientInactiveError(inactive);
+  }
 }
 
 async function hasActiveRoomConflict(
@@ -296,11 +314,8 @@ async function createSessionCore(
     throw new RoomNotFoundError(input.roomId);
   }
 
-  const existingPatientIds = await fetchExistingPatientIds(tx, clinicId, input.patientIds);
-  const missing = input.patientIds.filter((id) => !existingPatientIds.has(id));
-  if (missing.length > 0) {
-    throw new PatientNotFoundError(missing);
-  }
+  const patientStatus = await fetchPatientActiveStatus(tx, clinicId, input.patientIds);
+  assertPatientsBookable(input.patientIds, patientStatus);
 
   if (input.patientIds.length > room.capacity) {
     throw new RoomAtCapacityError(input.roomId);
@@ -363,10 +378,8 @@ async function addAttendeeCore(
     throw new SessionNotActiveError(sessionId);
   }
 
-  const existingPatientIds = await fetchExistingPatientIds(tx, clinicId, [patientId]);
-  if (!existingPatientIds.has(patientId)) {
-    throw new PatientNotFoundError([patientId]);
-  }
+  const patientStatus = await fetchPatientActiveStatus(tx, clinicId, [patientId]);
+  assertPatientsBookable([patientId], patientStatus);
 
   const [existingAttendee] = await tx
     .select({ id: sessionAttendees.id })

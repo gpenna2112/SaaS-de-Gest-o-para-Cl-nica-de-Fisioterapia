@@ -6,8 +6,8 @@ Repositórios tenant-scoped (ADR-0007).
 
 Uma `session` é a turma (um fisioterapeuta, uma sala, um horário); quem participa é `session_attendees` (1..N pacientes, até `rooms.capacity`). Quatro operações, todas em transação `SERIALIZABLE`, sem `FOR UPDATE` explícito (a garantia vem do isolamento), retry curto e limitado em `serialization_failure` (`src/db/transaction-retry.ts`):
 
-- `createSession` — cria a turma + os `attendees` iniciais (`patientIds: string[]`, exige ≥1, rejeita duplicatas, valida todos os pacientes antes de escrever); rejeita se a sala/horário já tem outra `session` ativa, se o profissional já tem outra `session` ativa sobreposta, ou se `patientIds.length > rooms.capacity`.
-- `addAttendee` — adiciona um paciente a uma turma já existente e ativa, respeitando a capacidade. Retorna `{ session, attendee }`.
+- `createSession` — cria a turma + os `attendees` iniciais (`patientIds: string[]`, exige ≥1, rejeita duplicatas, valida todos os pacientes antes de escrever); rejeita se a sala/horário já tem outra `session` ativa, se o profissional já tem outra `session` ativa sobreposta, se `patientIds.length > rooms.capacity`, ou se algum paciente está desativado (`PatientInactiveError`, ver `patients-repository.ts`).
+- `addAttendee` — adiciona um paciente a uma turma já existente e ativa, respeitando a capacidade e a mesma regra de paciente ativo. Retorna `{ session, attendee }`.
 - `rescheduleSession` — move a turma inteira (sala/horário), mantendo o mesmo profissional e todos os `attendees` vinculados; refaz as mesmas checagens de conflito.
 - `updateAttendeeStatus` — muda o status de um participante (agendada/confirmada/realizada/falta/cancelada — `session-state-machine.ts`). Cancelar um participante nunca cancela os demais; cancelar o **último** participante ativo cancela a `session` automaticamente, na mesma transação.
 
@@ -16,6 +16,10 @@ Todo método aceita uma `Tx` externa opcional como último parâmetro (ADR-0016)
 ## `notifications-repository.ts` (ADR-0016)
 
 Outbox vinculado a `session_attendees` (não a `session_id`+`patient_id` soltos). `createConfirmation`, `rescheduleConfirmationsForSession`, `cancelPendingForAttendee`, `markSent`/`markDelivered`/`markFailed`/`recordResponse`. Diferente de `scheduling`, nenhum método precisa de `SERIALIZABLE`/retry próprio — cada operação é uma única instrução atômica (`INSERT` protegido por `UNIQUE(session_attendee_id, template)`, ou `UPDATE` condicional/compare-and-swap). Aceita `Tx` ou `DbClient` indistintamente (`QueryExecutor`).
+
+## `patients-repository.ts`
+
+`createPatient`, `getPatient`, `listPatients`, `updatePatient`, `deactivatePatient`. Nenhum método precisa de `SERIALIZABLE` (sem contagem entre linhas concorrentes) — só atomicidade simples entre a escrita em `patients` e o registro em `audit_log`. `createPatient`/`updatePatient`/`deactivatePatient` geram entrada em `audit_log` (`entity_type = 'patient'`); `deactivatePatient` é idempotente e não tem efeito cascata sobre `scheduling`/`notifications` — ver README de `modules/patients`.
 
 ## `modules/scheduling/scheduling-service.ts`
 

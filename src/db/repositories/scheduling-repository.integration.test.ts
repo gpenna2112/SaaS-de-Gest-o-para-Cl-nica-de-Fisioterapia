@@ -7,6 +7,7 @@ import { createSchedulingRepository } from "./scheduling-repository";
 import {
   DuplicatePatientIdsError,
   NoPatientsProvidedError,
+  PatientInactiveError,
   PatientNotFoundError,
   ProfessionalConflictError,
   RoomAtCapacityError,
@@ -198,6 +199,42 @@ describe("SchedulingRepository — modelo session/session_attendees", () => {
     const remainingAttendees = await db.select().from(sessionAttendees).where(eq(sessionAttendees.clinicId, clinicId));
     expect(remainingSessions).toHaveLength(0);
     expect(remainingAttendees).toHaveLength(0);
+  });
+
+  it("impede agendar paciente desativado — desativação não cancela sessões existentes, mas bloqueia novas", async () => {
+    const { clinicId, professionalId, patientIds } = fixture;
+    const room = await createRoom(clinicId, 1);
+    const repo = createSchedulingRepository(db, clinicId);
+    const inactivePatientId = patientIds[0]!;
+    await db.update(patients).set({ active: false }).where(eq(patients.id, inactivePatientId));
+
+    await expect(
+      repo.createSession(
+        {
+          professionalId,
+          roomId: room.id,
+          scheduledStart: new Date("2026-08-03T22:00:00-03:00"),
+          scheduledEnd: new Date("2026-08-03T22:50:00-03:00"),
+          patientIds: [inactivePatientId],
+        },
+        { type: "professional", professionalId },
+      ),
+    ).rejects.toBeInstanceOf(PatientInactiveError);
+
+    // addAttendee também respeita a regra, numa sessão já existente e ativa.
+    const { session } = await repo.createSession(
+      {
+        professionalId,
+        roomId: room.id,
+        scheduledStart: new Date("2026-08-03T23:00:00-03:00"),
+        scheduledEnd: new Date("2026-08-03T23:50:00-03:00"),
+        patientIds: [patientIds[1]!],
+      },
+      { type: "professional", professionalId },
+    );
+    await expect(
+      repo.addAttendee(session.id, inactivePatientId, { type: "professional", professionalId }),
+    ).rejects.toBeInstanceOf(PatientInactiveError);
   });
 
   it("apenas uma session ativa pode ocupar a mesma sala no mesmo intervalo", async () => {

@@ -51,6 +51,19 @@ export class PatientNotFoundError extends Error {
   }
 }
 
+/**
+ * Um ou mais patientIds existem mas estão desativados (`patients.active =
+ * false`). Decisão de produto: desativar um paciente não cancela sessões
+ * futuras nem mexe em notificações, só impede *novos* agendamentos — ver
+ * modules/patients/README.md.
+ */
+export class PatientInactiveError extends Error {
+  constructor(public readonly patientIds: string[]) {
+    super(`Paciente(s) inativo(s), não pode(m) ser agendado(s): ${patientIds.join(", ")}.`);
+    this.name = "PatientInactiveError";
+  }
+}
+
 export class PatientAlreadyAttendingError extends Error {
   constructor(
     public readonly sessionId: string,

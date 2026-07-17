@@ -6,7 +6,7 @@ SaaS para clínicas de fisioterapia de pequeno e médio porte que operam **sem r
 
 ## Status
 
-**Agenda + notificações implementados e compostos atomicamente.** Arquitetura aprovada e documentada; schema Drizzle (8 tabelas — uma `session` é a turma, com 1 a `rooms.capacity` pacientes em `session_attendees`; confirmações em `notifications`, vinculadas por `session_attendee`), os repositórios de `scheduling` e `notifications`, e o serviço que os compõe numa única transação (criar sessão + agendar confirmação, ou nenhum dos dois) — tudo validado contra Postgres real, com testes de concorrência real. Ver ADR-0015/0016. Nenhuma rota de API, ou os módulos `patients`/`auth`/`jobs` implementados ainda.
+**Agenda + notificações + cadastro de pacientes implementados.** Arquitetura aprovada e documentada; schema Drizzle (8 tabelas — uma `session` é a turma, com 1 a `rooms.capacity` pacientes em `session_attendees`; confirmações em `notifications`, vinculadas por `session_attendee`), os repositórios de `scheduling`, `notifications` e `patients`, e o serviço que compõe scheduling+notifications numa única transação (criar sessão + agendar confirmação, ou nenhum dos dois) — tudo validado contra Postgres real, com testes de concorrência real. Desativar um paciente bloqueia novos agendamentos sem afetar sessões existentes. Ver ADR-0015/0016. Nenhuma rota de API, ou o módulo `auth`/`jobs` implementados ainda.
 
 ## Como rodar o projeto
 

@@ -6,6 +6,8 @@ Uma `session` é a turma — um fisioterapeuta, uma sala, um horário. Quem part
 
 **Limites:** não importa nada de `src/app` (Next.js). Não conhece o provedor de notificação — chama `notifications` através de sua interface pública (`NotificationsRepository`), nunca um adapter de canal diretamente. Não conhece detalhes de auth além de receber o ator já resolvido. `role` do profissional não restringe quem pode ser `professional_id` de uma sessão.
 
+`createSession`/`addAttendee` rejeitam `patientIds` de pacientes com `active = false` (`PatientInactiveError`) — regra de `patients` (ver seu README), aplicada aqui porque é o repositório que já lê a tabela `patients` para validar existência. Desativar um paciente não cancela sessões já existentes, só impede novos agendamentos.
+
 **Código implementado:**
 - `session-state-machine.ts` — pura, sem I/O (`isValidStatusTransition`, escopada a `AttendeeStatus`, o status de um participante).
 - `scheduling-service.ts` — orquestra `scheduling-repository` + `notifications-repository` numa única transação `SERIALIZABLE`: criar/adicionar sessão e agendar a confirmação são atômicos (ADR-0016) — ou os dois acontecem, ou nenhum. Canal fixo em `whatsapp_cloud_api` por ora (simplificação assumida, ver README de `notifications`).

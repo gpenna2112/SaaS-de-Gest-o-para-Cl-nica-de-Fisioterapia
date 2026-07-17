@@ -22,6 +22,7 @@ export const patients = pgTable(
     phone: text("phone"),
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index("patients_clinic_professional_idx").on(table.clinicId, table.primaryProfessionalId),
