@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Estado atual do projeto
 
-**Pré-implementação.** A arquitetura está aprovada e documentada, mas ainda não há código de aplicação, `package.json` nem comandos de build/teste. Quando o scaffolding for criado, atualize este arquivo com os comandos reais (dev, build, test, lint, migrações).
+**Scaffolding criado.** Next.js (App Router) + TypeScript estrito + ESLint/Prettier + Vitest, estrutura modular alinhada a `docs/architecture.md`. Nenhuma entidade de domínio, schema de banco (`src/db`), job (`src/jobs`) ou regra de negócio foi implementada — cada uma dessas pastas tem um `README.md` explicando por que está vazia e o que falta antes de preenchê-la. Três decisões arquiteturais seguem em aberto (modelo de `role`, remarcação in-place vs. nova linha, capacidade de sala) e bloqueiam o desenho do schema.
+
+Comandos: `npm run dev|build|start|lint|typecheck|test|test:watch|format`. Migrações ainda não existem (sem schema).
 
 ## O que é este projeto
 

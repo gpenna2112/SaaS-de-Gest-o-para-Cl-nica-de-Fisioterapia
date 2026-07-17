@@ -6,7 +6,43 @@ SaaS para clínicas de fisioterapia de pequeno e médio porte que operam **sem r
 
 ## Status
 
-**Pré-implementação.** Arquitetura aprovada e documentada; nenhum código de aplicação escrito ainda. O próximo passo é o modelo de dados do MVP e o scaffolding do projeto.
+**Fundação técnica criada.** Arquitetura aprovada e documentada; scaffolding do projeto (Next.js, TypeScript estrito, lint, testes) pronto. Nenhuma entidade de domínio, schema de banco ou regra de negócio implementada ainda — aguardando decisão sobre três pontos em aberto (modelo de papéis, remarcação de sessão, capacidade de sala) antes do modelo de dados do MVP.
+
+## Como rodar o projeto
+
+Pré-requisitos: Node.js 20+ e npm.
+
+```bash
+npm install
+cp .env.example .env.local   # preencha DATABASE_URL antes de usar o banco (ainda não implementado)
+npm run dev                  # http://localhost:3000
+```
+
+### Scripts
+
+| Script | O que faz |
+|---|---|
+| `npm run dev` | Sobe o servidor de desenvolvimento |
+| `npm run build` | Build de produção |
+| `npm run start` | Roda o build de produção |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run test` | Testes unitários (Vitest) |
+| `npm run test:watch` | Testes em modo watch |
+| `npm run format` / `format:check` | Prettier |
+
+### Estrutura
+
+```
+src/
+  app/            # Next.js App Router: páginas e rotas /api/v1
+  modules/        # Domínio puro (scheduling, patients, notifications, auth) — sem imports de Next.js
+  db/             # Conexão e schema do banco — ainda vazio, ver src/db/README.md
+  jobs/           # Jobs pg-boss — ainda vazio, ver src/jobs/README.md
+  lib/            # env.ts (variáveis tipadas), logger.ts (pino)
+```
+
+Cada pasta em `src/modules`, `src/db` e `src/jobs` tem um `README.md` explicando sua responsabilidade e por que ainda está vazia.
 
 ## O MVP em uma frase
 
