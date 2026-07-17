@@ -1,0 +1,35 @@
+# db/repositories
+
+Repositórios tenant-scoped (ADR-0007). `scheduling-repository.ts` implementa o modelo do ADR-0015: uma `session` é a turma (um fisioterapeuta, uma sala, um horário); quem participa é `session_attendees` (1..N pacientes, até `rooms.capacity`). Quatro operações, todas em transação `SERIALIZABLE`, sem `FOR UPDATE` explícito (a garantia vem do isolamento), retry curto e limitado em `serialization_failure` (`src/db/transaction-retry.ts`):
+
+- `createSession` — cria a turma + os `attendees` iniciais (`patientIds: string[]`, exige ≥1, rejeita duplicatas, valida todos os pacientes antes de escrever); rejeita se a sala/horário já tem outra `session` ativa, se o profissional já tem outra `session` ativa sobreposta, ou se `patientIds.length > rooms.capacity`.
+- `addAttendee` — adiciona um paciente a uma turma já existente e ativa, respeitando a capacidade.
+- `rescheduleSession` — move a turma inteira (sala/horário), mantendo o mesmo profissional e todos os `attendees` vinculados; refaz as mesmas checagens de conflito.
+- `updateAttendeeStatus` — muda o status de um participante (agendada/confirmada/realizada/falta/cancelada — `session-state-machine.ts`). Cancelar um participante nunca cancela os demais; cancelar o **último** participante ativo cancela a `session` automaticamente, na mesma transação.
+
+## Testes de integração (`*.integration.test.ts`)
+
+Cobrem exatamente o que testes unitários não conseguem provar: a garantia de concorrência real sob `SERIALIZABLE`/SSI. Mockar isso testaria só que o código chama um mock corretamente, não que a garantia existe — por isso rodam contra um Postgres de verdade e ficam **fora** de `npm run test` (config separada: `vitest.integration.config.ts`).
+
+**O que este comando NÃO faz:** não sobe, para ou remove nenhum container automaticamente. O teste só se conecta a `TEST_DATABASE_URL` (ou `DATABASE_URL` como fallback) — se a variável não apontar para um Postgres alcançável com as migrations já aplicadas, o teste falha na primeira query com um erro claro, não silenciosamente.
+
+### Como rodar
+
+Você precisa de um Postgres alcançável, com as migrations aplicadas, antes de rodar `npm run test:integration`. Exemplo de setup local descartável (execute manualmente — nenhuma automação faz isso por você):
+
+```bash
+docker run --rm -d --name clinic-mgmt-test-db \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=clinic_management_test \
+  -p 5433:5432 postgres:16-alpine
+
+export TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5433/clinic_management_test
+DATABASE_URL=$TEST_DATABASE_URL npm run db:migrate
+
+npm run test:integration
+
+docker rm -f clinic-mgmt-test-db
+```
+
+### Isolamento e limpeza
+
+Cada teste cria sua própria `clinic` (com pacientes/salas/profissionais vinculados a ela) em `beforeEach` e apaga tudo daquela `clinic_id` em `afterEach` (ordem reversa de FK: `audit_log` → `sessions` → `patients`/`rooms` → `professionals` → `clinics`). Cenários não compartilham dados entre si mesmo rodando na mesma instância de banco.

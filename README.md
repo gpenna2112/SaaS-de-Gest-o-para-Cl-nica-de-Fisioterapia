@@ -6,7 +6,7 @@ SaaS para clínicas de fisioterapia de pequeno e médio porte que operam **sem r
 
 ## Status
 
-**Fundação técnica criada.** Arquitetura aprovada e documentada; scaffolding do projeto (Next.js, TypeScript estrito, lint, testes) pronto. Nenhuma entidade de domínio, schema de banco ou regra de negócio implementada ainda — aguardando decisão sobre três pontos em aberto (modelo de papéis, remarcação de sessão, capacidade de sala) antes do modelo de dados do MVP.
+**Repositório de agenda implementado.** Arquitetura aprovada e documentada; schema Drizzle (8 tabelas, incluindo `session_attendees` — uma `session` é a turma, com 1 a `rooms.capacity` pacientes) e o repositório de `scheduling` (`createSession`, `addAttendee`, `rescheduleSession`, `updateAttendeeStatus`) implementados e validados contra Postgres real, com testes de concorrência real. Ver ADR-0015. Nenhuma camada de serviço/orquestração, rota de API, ou os módulos `patients`/`notifications`/`auth`/`jobs` implementados ainda.
 
 ## Como rodar o projeto
 
@@ -14,7 +14,8 @@ Pré-requisitos: Node.js 20+ e npm.
 
 ```bash
 npm install
-cp .env.example .env.local   # preencha DATABASE_URL antes de usar o banco (ainda não implementado)
+cp .env.example .env.local   # preencha DATABASE_URL com um Postgres real
+npm run db:migrate           # aplica as migrations em src/db/migrations
 npm run dev                  # http://localhost:3000
 ```
 
@@ -30,6 +31,8 @@ npm run dev                  # http://localhost:3000
 | `npm run test` | Testes unitários (Vitest) |
 | `npm run test:watch` | Testes em modo watch |
 | `npm run format` / `format:check` | Prettier |
+| `npm run db:generate` | Gera migration SQL a partir do schema Drizzle |
+| `npm run db:migrate` | Aplica as migrations pendentes no banco de `DATABASE_URL` |
 
 ### Estrutura
 
@@ -37,12 +40,12 @@ npm run dev                  # http://localhost:3000
 src/
   app/            # Next.js App Router: páginas e rotas /api/v1
   modules/        # Domínio puro (scheduling, patients, notifications, auth) — sem imports de Next.js
-  db/             # Conexão e schema do banco — ainda vazio, ver src/db/README.md
+  db/             # Schema Drizzle, migrations e client de conexão — ver src/db/README.md
   jobs/           # Jobs pg-boss — ainda vazio, ver src/jobs/README.md
   lib/            # env.ts (variáveis tipadas), logger.ts (pino)
 ```
 
-Cada pasta em `src/modules`, `src/db` e `src/jobs` tem um `README.md` explicando sua responsabilidade e por que ainda está vazia.
+Cada pasta em `src/modules` e `src/jobs` tem um `README.md` explicando sua responsabilidade e por que ainda está vazia; `src/db/README.md` documenta as decisões que moldam o schema atual.
 
 ## O MVP em uma frase
 
@@ -53,7 +56,7 @@ Agenda unificada onde **a sala é o recurso escasso** (4 fisioterapeutas ÷ 3 es
 | Camada | Escolha |
 |---|---|
 | Aplicação | Monólito modular em TypeScript — Next.js (PWA responsiva + API REST `/api/v1`) |
-| Banco | PostgreSQL gerenciado (conflito de sala garantido por exclusion constraint) |
+| Banco | PostgreSQL gerenciado (ocupação de sala validada na aplicação por capacidade, ADR-0013) |
 | ORM | Drizzle |
 | Jobs | pg-boss (worker no mesmo processo) |
 | Auth | Better Auth (self-hosted, e-mail/senha) |

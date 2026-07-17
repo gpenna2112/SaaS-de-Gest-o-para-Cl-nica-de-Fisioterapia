@@ -7,7 +7,7 @@ Registro das decisões arquiteturais do projeto: contexto, alternativas consider
 | # | Decisão | Status |
 |---|---|---|
 | [0001](0001-monolito-modular-typescript-nextjs.md) | Monólito modular em TypeScript com Next.js | Aceito |
-| [0002](0002-postgresql-exclusion-constraint.md) | PostgreSQL, com conflito de sala garantido por exclusion constraint | Aceito |
+| [0002](0002-postgresql-exclusion-constraint.md) | PostgreSQL, com conflito de sala garantido por exclusion constraint | Aceito · mecanismo qualificado pelo 0013 |
 | [0003](0003-drizzle-orm.md) | Drizzle como ORM | Aceito |
 | [0004](0004-api-rest-versionada.md) | API REST versionada `/api/v1` (API-first) | Aceito |
 | [0005](0005-pwa-responsiva.md) | PWA responsiva em vez de app nativo | Aceito |
@@ -18,6 +18,9 @@ Registro das decisões arquiteturais do projeto: contexto, alternativas consider
 | [0010](0010-auditoria-e-imutabilidade.md) | Auditoria via `audit_log` e imutabilidade de sessões | Aceito |
 | [0011](0011-backup-e-recuperacao.md) | Backup: dump externo diário + teste de restore | Aceito |
 | [0012](0012-observabilidade-minima.md) | Observabilidade mínima: pino, Sentry, uptime com health do worker | Aceito |
+| [0013](0013-capacidade-sala-validacao-aplicacao.md) | Capacidade de sala: validação na aplicação via transação `SERIALIZABLE` | Aceito · algoritmo superado pelo 0015 (contava sessions, não attendees) |
+| [0014](0014-concorrencia-scheduling-escopo-retry-testes.md) | Controle de concorrência em `scheduling`: escopo, retry e estratégia de teste | Aceito · mecanismo de retry continua válido, escopo detalhado no 0015 |
+| [0015](0015-modelo-participacao-session-attendees.md) | Modelo de participação: `session_attendees`, conflito de sala/profissional, cancelamento em cascata | Aceito |
 
 ## Formato
 

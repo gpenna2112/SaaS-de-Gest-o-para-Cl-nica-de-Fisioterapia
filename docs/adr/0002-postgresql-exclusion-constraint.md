@@ -1,7 +1,9 @@
 # ADR-0002 — PostgreSQL, com conflito de sala garantido por exclusion constraint
 
-- **Status:** Aceito
+- **Status:** Aceito · mecanismo de exclusion constraint qualificado pelo [ADR-0013](0013-capacidade-sala-validacao-aplicacao.md)
 - **Data:** 2026-07-17
+
+> **Nota de atualização (2026-07-17):** a capacidade de sala deixou de ser implicitamente 1 (produto passou a exigir salas com capacidade > 1, ex. Pilates). `EXCLUDE USING gist` não expressa "no máximo N sobreposições" para N > 1, então o mecanismo de conflito de sala descrito abaixo foi substituído por validação na camada de aplicação — ver ADR-0013. A escolha de PostgreSQL, JSONB e o restante desta decisão continuam válidos; apenas o mecanismo específico de exclusion constraint não é mais usado.
 
 ## Contexto
 

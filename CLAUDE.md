@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Estado atual do projeto
 
-**Scaffolding criado.** Next.js (App Router) + TypeScript estrito + ESLint/Prettier + Vitest, estrutura modular alinhada a `docs/architecture.md`. Nenhuma entidade de domínio, schema de banco (`src/db`), job (`src/jobs`) ou regra de negócio foi implementada — cada uma dessas pastas tem um `README.md` explicando por que está vazia e o que falta antes de preenchê-la. Três decisões arquiteturais seguem em aberto (modelo de `role`, remarcação in-place vs. nova linha, capacidade de sala) e bloqueiam o desenho do schema.
+**Repositório de `scheduling` implementado (modelo session/session_attendees).** Next.js (App Router) + TypeScript estrito + ESLint/Prettier + Vitest, estrutura modular alinhada a `docs/architecture.md`. Schema Drizzle (8 tabelas) e o repositório de agenda (`src/db/repositories/scheduling-repository.ts`: `createSession`, `addAttendee`, `rescheduleSession`, `updateAttendeeStatus`) implementados e validados contra Postgres real — ver `src/db/README.md`, `src/db/repositories/README.md` e ADR-0015. Nenhuma camada de serviço/orquestração, rota de API, ou os módulos `patients`/`notifications`/`auth`/`jobs` foram implementados ainda.
 
-Comandos: `npm run dev|build|start|lint|typecheck|test|test:watch|format`. Migrações ainda não existem (sem schema).
+Comandos: `npm run dev|build|start|lint|typecheck|test|test:watch|test:integration|format|db:generate|db:migrate`. `test:integration` exige Postgres real provisionado manualmente — nunca sobe/derruba container sozinho (ver `src/db/repositories/README.md`).
 
 ## O que é este projeto
 
@@ -27,9 +27,10 @@ Monólito modular TypeScript: Next.js servindo a PWA (mobile-first para fisios, 
 Estas regras vêm dos ADRs e do PRD; violá-las é regressão de arquitetura:
 
 - **Lógica de domínio fora do framework.** Módulos de serviço (`scheduling`, `patients`, `notifications`, `auth`) não importam nada do Next.js. Rotas são cascas finas. (ADR-0001)
-- **Conflito de sala é garantido pelo banco**, via exclusion constraint (`EXCLUDE ... USING gist`) em migração SQL manual — nunca apenas por verificação em código de aplicação. (ADR-0002)
+- **`sessions` é a turma (1 profissional, 1 sala, 1 horário), nunca um paciente.** Quem participa é `session_attendees` (1..N pacientes, até `rooms.capacity`). Status completo (agendada/confirmada/realizada/falta/cancelada) é por participante; `sessions.status` só tem `ativa`/`cancelada`. Cancelar o último `attendee` ativo cancela a `session` automaticamente. (ADR-0015)
+- **Toda mutação que lê-para-validar-depois-escreve roda em transação `SERIALIZABLE`** — conflito de sala (uma `session` ativa por sala/horário), conflito de profissional (um profissional não conduz duas `sessions` ativas sobrepostas, mesmo em salas diferentes), capacidade de `session_attendees`, transições de status. Sem `FOR UPDATE` explícito — a garantia vem do isolamento. Retry limitado (3 tentativas, backoff curto) só em `serialization_failure`; nunca esconde outros erros. Erros de regra de negócio (`RoomAtCapacityError`, `RoomConflictError`, `ProfessionalConflictError`) são distintos de `SchedulingConflictError` (concorrência esgotada). Não é `EXCLUDE` constraint no banco. (ADR-0013 + ADR-0014 + ADR-0015, qualificam o ADR-0002)
 - **Multi-tenant desde o dia 1:** toda tabela de domínio tem `clinic_id`; todo acesso a dados passa por repositórios tenant-scoped. Nenhuma query crua no domínio. RLS será ativado antes da 2ª clínica ou da fase 3. (ADR-0007)
-- **Sessões nunca são deletadas.** Cancelamento e remarcação são transições de estado. Toda mutação de agenda/status grava entrada em `audit_log` (ator, ação, antes/depois) na camada de serviço. (ADR-0010)
+- **`sessions` e `session_attendees` nunca são deletadas.** Cancelamento e remarcação são transições de estado. Toda mutação de agenda/status grava entrada em `audit_log` (ator, ação, antes/depois) na camada de serviço. (ADR-0010)
 - **Notificações passam pelo outbox.** Nenhum envio direto a provedor; o domínio grava a notificação na tabela e o worker a processa via adapter de canal. Status de entrega é dado de produto (alimenta o KPI de taxa de confirmação), não log. (ADR-0009)
 - **API pública versionada:** identidades expostas externamente (paciente, sessão) usam UUID público. A UI consome a mesma `/api/v1` que sistemas externos consumirão. (ADR-0004)
 - **Auth isolada:** o código da aplicação conhece apenas a interface própria (ex.: `getSessionUser()`), nunca a API do Better Auth diretamente. Versão da biblioteca fixada; upgrade é tarefa deliberada. (ADR-0006)
