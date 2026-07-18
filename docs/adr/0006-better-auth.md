@@ -1,6 +1,6 @@
 # ADR-0006 — Better Auth self-hosted, isolada atrás de interface própria
 
-- **Status:** Aceito
+- **Status:** Aceito · escopo de implementação (Organizations, provisionamento, autorização, FK de `professionals.auth_user_id`) detalhado no [ADR-0017](0017-auth-escopo-provisionamento-autorizacao.md)
 - **Data:** 2026-07-17
 
 ## Contexto

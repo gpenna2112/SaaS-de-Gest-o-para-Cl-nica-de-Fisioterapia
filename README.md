@@ -6,7 +6,7 @@ SaaS para clínicas de fisioterapia de pequeno e médio porte que operam **sem r
 
 ## Status
 
-**Agenda + notificações + cadastro de pacientes implementados.** Arquitetura aprovada e documentada; schema Drizzle (8 tabelas — uma `session` é a turma, com 1 a `rooms.capacity` pacientes em `session_attendees`; confirmações em `notifications`, vinculadas por `session_attendee`), os repositórios de `scheduling`, `notifications` e `patients`, e o serviço que compõe scheduling+notifications numa única transação (criar sessão + agendar confirmação, ou nenhum dos dois) — tudo validado contra Postgres real, com testes de concorrência real. Desativar um paciente bloqueia novos agendamentos sem afetar sessões existentes. Ver ADR-0015/0016. Nenhuma rota de API, ou o módulo `auth`/`jobs` implementados ainda.
+**Agenda + notificações + cadastro de pacientes + autenticação implementados.** Arquitetura aprovada e documentada; schema Drizzle (8 tabelas de domínio — uma `session` é a turma, com 1 a `rooms.capacity` pacientes em `session_attendees`; confirmações em `notifications`, vinculadas por `session_attendee` — mais 4 tabelas do Better Auth em histórico de migração separado), os repositórios de `scheduling`, `notifications`, `patients` e `professionals-auth-repository`, e o serviço que compõe scheduling+notifications numa única transação (criar sessão + agendar confirmação, ou nenhum dos dois) — tudo validado contra Postgres real, com testes de concorrência real. Desativar um paciente bloqueia novos agendamentos sem afetar sessões existentes. Autenticação via Better Auth (e-mail/senha, sessão de 60 dias): signup só vincula a um `professional` pré-existente, sem convite por token; `getSessionUser`/`requireSessionUser`/`requireRole` protegem rotas, com `professionals.active` checado a cada requisição. Ver ADR-0015/0016/0017. Nenhuma rota de API além de `/api/auth/[...all]`, nem o módulo `jobs`, implementados ainda.
 
 ## Como rodar o projeto
 
@@ -14,8 +14,9 @@ Pré-requisitos: Node.js 20+ e npm.
 
 ```bash
 npm install
-cp .env.example .env.local   # preencha DATABASE_URL com um Postgres real
-npm run db:migrate           # aplica as migrations em src/db/migrations
+cp .env.example .env.local   # preencha DATABASE_URL, BETTER_AUTH_SECRET e BETTER_AUTH_URL
+npm run db:migrate           # aplica as migrations de domínio em src/db/migrations
+npm run auth:db:migrate      # aplica as migrations do Better Auth em src/modules/auth/migrations
 npm run dev                  # http://localhost:3000
 ```
 
@@ -31,8 +32,12 @@ npm run dev                  # http://localhost:3000
 | `npm run test` | Testes unitários (Vitest) |
 | `npm run test:watch` | Testes em modo watch |
 | `npm run format` / `format:check` | Prettier |
-| `npm run db:generate` | Gera migration SQL a partir do schema Drizzle |
-| `npm run db:migrate` | Aplica as migrations pendentes no banco de `DATABASE_URL` |
+| `npm run db:generate` | Gera migration SQL a partir do schema Drizzle (domínio) |
+| `npm run db:migrate` | Aplica as migrations de domínio pendentes no banco de `DATABASE_URL` |
+| `npm run test:integration` | Testes de integração (exige Postgres real com as duas migrations aplicadas — ver `src/db/repositories/README.md`) |
+| `npm run auth:schema:generate` | Gera `src/modules/auth/better-auth-schema.ts` via CLI do Better Auth |
+| `npm run auth:db:generate` | Gera migration SQL das tabelas do Better Auth (histórico separado) |
+| `npm run auth:db:migrate` | Aplica as migrations do Better Auth pendentes |
 
 ### Estrutura
 

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "professionals_auth_user_id_unique" ON "professionals" USING btree ("auth_user_id") WHERE "professionals"."auth_user_id" is not null;

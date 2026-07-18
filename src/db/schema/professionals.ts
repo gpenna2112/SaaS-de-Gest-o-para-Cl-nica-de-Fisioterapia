@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, index, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, index, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { clinics } from "./clinics";
 
 export const professionals = pgTable(
@@ -11,9 +11,11 @@ export const professionals = pgTable(
     clinicId: uuid("clinic_id")
       .notNull()
       .references(() => clinics.id),
-    // Sem FK enforçada de propósito: as tabelas do Better Auth são criadas por
-    // um sistema de migração separado (ver ADR-0006). Revisitar quando o
-    // módulo auth for implementado.
+    // Sem FK enforçada para o `user` do Better Auth, de propósito — decisão
+    // reconfirmada e detalhada no ADR-0017 (integridade real, migrações
+    // independentes, e não acoplar nosso schema à forma interna de uma
+    // tabela que não controlamos). Gatilho de revisão: versão do Better
+    // Auth considerada estável, ou incidente real de referência órfã.
     authUserId: text("auth_user_id"),
     name: text("name").notNull(),
     email: text("email").notNull(),
@@ -25,5 +27,11 @@ export const professionals = pgTable(
     unique("professionals_clinic_email_unique").on(table.clinicId, table.email),
     index("professionals_clinic_active_idx").on(table.clinicId, table.active),
     check("professionals_role_check", sql`${table.role} in ('fisioterapeuta','gestora')`),
+    // Uma identidade do Better Auth vincula no máximo um `professional`
+    // (ADR-0017) — parcial porque `auth_user_id` é nullable (profissional
+    // pré-provisionado sem conta ativada ainda).
+    uniqueIndex("professionals_auth_user_id_unique")
+      .on(table.authUserId)
+      .where(sql`${table.authUserId} is not null`),
   ],
 );

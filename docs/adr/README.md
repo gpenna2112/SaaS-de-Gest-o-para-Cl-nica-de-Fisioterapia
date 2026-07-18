@@ -11,7 +11,7 @@ Registro das decisões arquiteturais do projeto: contexto, alternativas consider
 | [0003](0003-drizzle-orm.md) | Drizzle como ORM | Aceito |
 | [0004](0004-api-rest-versionada.md) | API REST versionada `/api/v1` (API-first) | Aceito |
 | [0005](0005-pwa-responsiva.md) | PWA responsiva em vez de app nativo | Aceito |
-| [0006](0006-better-auth.md) | Better Auth self-hosted, isolada atrás de interface própria | Aceito |
+| [0006](0006-better-auth.md) | Better Auth self-hosted, isolada atrás de interface própria | Aceito · escopo/provisionamento/autorização detalhados no 0017 |
 | [0007](0007-multi-tenancy.md) | Multi-tenancy: shared schema + `clinic_id`; RLS como pré-condição de crescimento | Aceito |
 | [0008](0008-infraestrutura-railway.md) | Infraestrutura: Railway, processo persistente, pg-boss | Aceito |
 | [0009](0009-notificacoes-outbox-adapters.md) | Notificações: outbox persistido + adapters de canal | Aceito · schema/vínculo detalhados no 0016 |
@@ -22,6 +22,7 @@ Registro das decisões arquiteturais do projeto: contexto, alternativas consider
 | [0014](0014-concorrencia-scheduling-escopo-retry-testes.md) | Controle de concorrência em `scheduling`: escopo, retry e estratégia de teste | Aceito · mecanismo de retry continua válido, escopo detalhado no 0015 |
 | [0015](0015-modelo-participacao-session-attendees.md) | Modelo de participação: `session_attendees`, conflito de sala/profissional, cancelamento em cascata | Aceito |
 | [0016](0016-notifications-outbox-session-attendee.md) | Notifications: vínculo por `session_attendee`, idempotência, atomicidade com `scheduling` | Aceito |
+| [0017](0017-auth-escopo-provisionamento-autorizacao.md) | Auth: escopo do Better Auth, provisionamento, autorização por rota, sem FK para `user` | Aceito |
 
 ## Formato
 
