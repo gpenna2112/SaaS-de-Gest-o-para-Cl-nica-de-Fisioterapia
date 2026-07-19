@@ -46,6 +46,7 @@ export default async function NewSessionPage({
         patients={patients.map((patient) => ({ id: patient.id, name: patient.name }))}
         defaultDurationMinutes={clinic?.defaultSessionDurationMinutes ?? 50}
         initialDate={initialDate}
+        currentProfessionalId={sessionUser.professionalId}
       />
     </div>
   );

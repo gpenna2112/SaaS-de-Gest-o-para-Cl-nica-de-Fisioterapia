@@ -33,15 +33,22 @@ export function SessionForm({
   patients,
   defaultDurationMinutes,
   initialDate,
+  currentProfessionalId,
 }: {
   professionals: ProfessionalOption[];
   rooms: RoomOption[];
   patients: PatientOption[];
   defaultDurationMinutes: number;
   initialDate: string;
+  /** Profissional logado — pré-selecionado por ser o caso mais comum (a
+   * própria fisio se agendando), se ele estiver entre os ativos da clínica. */
+  currentProfessionalId?: string;
 }) {
   const router = useRouter();
-  const [professionalId, setProfessionalId] = useState(professionals[0]?.id ?? "");
+  const defaultProfessionalId = professionals.some((professional) => professional.id === currentProfessionalId)
+    ? currentProfessionalId!
+    : (professionals[0]?.id ?? "");
+  const [professionalId, setProfessionalId] = useState(defaultProfessionalId);
   const [roomId, setRoomId] = useState(rooms[0]?.id ?? "");
   const [date, setDate] = useState(initialDate);
   const [startTime, setStartTime] = useState(DEFAULT_START_TIME);
