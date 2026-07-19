@@ -458,3 +458,116 @@ describe("SchedulingRepository — modelo session/session_attendees", () => {
     expect(activeSessions).toHaveLength(1);
   });
 });
+
+describe("SchedulingRepository — listSessions", () => {
+  let fixture: TestFixture;
+
+  beforeEach(async () => {
+    fixture = await setupClinic();
+  });
+
+  afterEach(async () => {
+    await cleanupClinic(fixture.clinicId);
+  });
+
+  afterAll(async () => {
+    await db.$client.end();
+  });
+
+  it("retorna sessões ativas dentro do intervalo, com attendees", async () => {
+    const { clinicId, professionalId, patientIds } = fixture;
+    const room = await createRoom(clinicId, 2);
+    const repo = createSchedulingRepository(db, clinicId);
+    const start = new Date("2026-09-01T13:00:00-03:00");
+    const end = new Date("2026-09-01T13:50:00-03:00");
+
+    const { session } = await repo.createSession(
+      {
+        professionalId,
+        roomId: room.id,
+        scheduledStart: start,
+        scheduledEnd: end,
+        patientIds: [patientIds[0]!, patientIds[1]!],
+      },
+      { type: "professional", professionalId },
+    );
+
+    const result = await repo.listSessions({
+      rangeStart: new Date("2026-09-01T00:00:00-03:00"),
+      rangeEnd: new Date("2026-09-01T23:59:59-03:00"),
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.id).toBe(session.id);
+    expect(result[0]!.attendees.map((a) => a.patientId).sort()).toEqual(
+      [patientIds[0]!, patientIds[1]!].sort(),
+    );
+  });
+
+  it("dia sem sessões retorna lista vazia", async () => {
+    const { clinicId } = fixture;
+    const repo = createSchedulingRepository(db, clinicId);
+
+    const result = await repo.listSessions({
+      rangeStart: new Date("2026-09-02T00:00:00-03:00"),
+      rangeEnd: new Date("2026-09-02T23:59:59-03:00"),
+    });
+
+    expect(result).toEqual([]);
+  });
+
+  it("filtra por roomId", async () => {
+    const { clinicId, professionalId, professionalId2, patientIds } = fixture;
+    const roomA = await createRoom(clinicId, 1);
+    const roomB = await createRoom(clinicId, 1);
+    const repo = createSchedulingRepository(db, clinicId);
+    const start = new Date("2026-09-03T13:00:00-03:00");
+    const end = new Date("2026-09-03T13:50:00-03:00");
+
+    await repo.createSession(
+      { professionalId, roomId: roomA.id, scheduledStart: start, scheduledEnd: end, patientIds: [patientIds[0]!] },
+      { type: "professional", professionalId },
+    );
+    await repo.createSession(
+      {
+        professionalId: professionalId2,
+        roomId: roomB.id,
+        scheduledStart: start,
+        scheduledEnd: end,
+        patientIds: [patientIds[1]!],
+      },
+      { type: "professional", professionalId: professionalId2 },
+    );
+
+    const result = await repo.listSessions({
+      rangeStart: new Date("2026-09-03T00:00:00-03:00"),
+      rangeEnd: new Date("2026-09-03T23:59:59-03:00"),
+      roomId: roomA.id,
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.roomId).toBe(roomA.id);
+  });
+
+  it("sessão cancelada não aparece", async () => {
+    const { clinicId, professionalId, patientIds } = fixture;
+    const room = await createRoom(clinicId, 1);
+    const repo = createSchedulingRepository(db, clinicId);
+    const start = new Date("2026-09-04T13:00:00-03:00");
+    const end = new Date("2026-09-04T13:50:00-03:00");
+
+    const { attendees } = await repo.createSession(
+      { professionalId, roomId: room.id, scheduledStart: start, scheduledEnd: end, patientIds: [patientIds[0]!] },
+      { type: "professional", professionalId },
+    );
+    // Cancelar o único attendee ativo cancela a session automaticamente (ADR-0015).
+    await repo.updateAttendeeStatus(attendees[0]!.id, "cancelada", { type: "professional", professionalId });
+
+    const result = await repo.listSessions({
+      rangeStart: new Date("2026-09-04T00:00:00-03:00"),
+      rangeEnd: new Date("2026-09-04T23:59:59-03:00"),
+    });
+
+    expect(result).toEqual([]);
+  });
+});

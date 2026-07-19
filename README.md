@@ -10,15 +10,41 @@ SaaS para clínicas de fisioterapia de pequeno e médio porte que operam **sem r
 
 ## Como rodar o projeto
 
-Pré-requisitos: Node.js 20+ e npm.
+Pré-requisitos: Node.js 20+, npm e Docker (para o Postgres local).
 
 ```bash
 npm install
-cp .env.example .env.local   # preencha DATABASE_URL, BETTER_AUTH_SECRET e BETTER_AUTH_URL
+
+# Postgres local persistente (ajuste a porta host se 5432 já estiver em uso).
+docker volume create clinic-mgmt-dev-db-data
+docker run -d --name clinic-mgmt-dev-db \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=clinic_management \
+  -p 5434:5432 -v clinic-mgmt-dev-db-data:/var/lib/postgresql/data \
+  postgres:16-alpine
+
+cp .env.example .env.local
+# Preencha DATABASE_URL apontando para a porta escolhida acima, gere
+# BETTER_AUTH_SECRET (openssl rand -base64 32) e ajuste BETTER_AUTH_URL para
+# a porta em que o `next dev` efetivamente subir (ele pula para a próxima
+# porta livre se 3000 estiver ocupada — confira o log ao rodar `npm run dev`).
+
 npm run db:migrate           # aplica as migrations de domínio em src/db/migrations
 npm run auth:db:migrate      # aplica as migrations do Better Auth em src/modules/auth/migrations
-npm run dev                  # http://localhost:3000
+npm run db:seed:dev          # popula uma clínica de exemplo (ver scripts/seed-dev.ts) — rode só uma vez por banco
+npm run dev
 ```
+
+O seed cria profissionais **sem login vinculado ainda** (mesmo fluxo real de provisionamento — ver ADR-0017). Para conseguir entrar em `/login`, crie a conta pelo endpoint real do Better Auth (uma vez, por profissional que você quiser usar):
+
+```bash
+curl -X POST http://localhost:3001/api/auth/sign-up/email \
+  -H "Content-Type: application/json" \
+  -d '{"email":"angelica@clinica-exemplo.test","password":"dev12345678","name":"Angélica"}'
+```
+
+Depois disso, entre em `/login` com esse e-mail/senha. Profissionais disponíveis no seed: `angelica@clinica-exemplo.test` (gestora), `patricia@clinica-exemplo.test` (gestora), `fernanda@clinica-exemplo.test` (fisioterapeuta), `sophia@clinica-exemplo.test` (fisioterapeuta) — todas com a mesma senha usada no signup.
+
+Para parar/retomar o banco entre sessões, sem perder dados: `docker stop clinic-mgmt-dev-db` / `docker start clinic-mgmt-dev-db`. Para descartar tudo e recomeçar: `docker rm -f clinic-mgmt-dev-db && docker volume rm clinic-mgmt-dev-db-data`, depois repita os passos acima.
 
 ### Scripts
 
@@ -38,6 +64,7 @@ npm run dev                  # http://localhost:3000
 | `npm run auth:schema:generate` | Gera `src/modules/auth/better-auth-schema.ts` via CLI do Better Auth |
 | `npm run auth:db:generate` | Gera migration SQL das tabelas do Better Auth (histórico separado) |
 | `npm run auth:db:migrate` | Aplica as migrations do Better Auth pendentes |
+| `npm run db:seed:dev` | Popula uma clínica de exemplo em `DATABASE_URL` para navegação manual (`scripts/seed-dev.ts`) — dev-only, não usa os repositórios/audit_log |
 
 ### Estrutura
 

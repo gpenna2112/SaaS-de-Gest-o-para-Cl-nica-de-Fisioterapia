@@ -29,8 +29,8 @@ function extractSessionCookie(response: Response): string {
   return setCookie.split(";")[0]!;
 }
 
-function requestWithCookie(cookie?: string): Request {
-  return new Request("http://localhost:3000/x", cookie ? { headers: { cookie } } : undefined);
+function headersWithCookie(cookie?: string): Headers {
+  return new Headers(cookie ? { cookie } : undefined);
 }
 
 interface Fixture {
@@ -79,7 +79,7 @@ describe("getSessionUser — fluxo de sessão real com Better Auth", () => {
   });
 
   it("retorna null quando não há cookie de sessão", async () => {
-    expect(await getSessionUser(requestWithCookie())).toBeNull();
+    expect(await getSessionUser(headersWithCookie())).toBeNull();
   });
 
   it("signup vincula o professional pré-existente e getSessionUser resolve o profissional certo", async () => {
@@ -94,7 +94,7 @@ describe("getSessionUser — fluxo de sessão real com Better Auth", () => {
     expect(signUpResponse.status).toBe(200);
     const cookie = extractSessionCookie(signUpResponse);
 
-    const sessionUser = await getSessionUser(requestWithCookie(cookie));
+    const sessionUser = await getSessionUser(headersWithCookie(cookie));
 
     expect(sessionUser).toEqual({
       professionalId,
@@ -117,13 +117,13 @@ describe("getSessionUser — fluxo de sessão real com Better Auth", () => {
     const cookie = extractSessionCookie(signUpResponse);
 
     // Confirma que a sessão está válida antes de desativar.
-    expect(await getSessionUser(requestWithCookie(cookie))).not.toBeNull();
+    expect(await getSessionUser(headersWithCookie(cookie))).not.toBeNull();
 
     await db.update(professionals).set({ active: false }).where(eq(professionals.id, professionalId));
 
     // Mesma sessão (mesmo cookie) — a checagem de `active` é feita a cada
     // chamada, não só no login.
-    expect(await getSessionUser(requestWithCookie(cookie))).toBeNull();
+    expect(await getSessionUser(headersWithCookie(cookie))).toBeNull();
   });
 
   it("signup é rejeitado quando não há professional correspondente ao e-mail (sem convite por token — ADR-0017)", async () => {

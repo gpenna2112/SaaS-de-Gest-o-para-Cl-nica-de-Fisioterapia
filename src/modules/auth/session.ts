@@ -24,8 +24,8 @@ function getDb(): DbClient {
  * só no login (sessão dura ~60 dias; sem essa checagem viva, alguém
  * desativado manteria acesso até a sessão expirar).
  */
-export async function getSessionUser(request: Request): Promise<SessionUser | null> {
-  const authSession = await getAuth().api.getSession({ headers: request.headers });
+export async function getSessionUser(headers: Headers): Promise<SessionUser | null> {
+  const authSession = await getAuth().api.getSession({ headers });
   if (!authSession) {
     return null;
   }
@@ -51,16 +51,16 @@ export async function getSessionUser(request: Request): Promise<SessionUser | nu
  * Response — a rota (casca fina, ADR-0001) decide o mapeamento HTTP
  * (401/403), este módulo não conhece Next.js.
  */
-export async function requireSessionUser(request: Request): Promise<SessionUser> {
-  const sessionUser = await getSessionUser(request);
+export async function requireSessionUser(headers: Headers): Promise<SessionUser> {
+  const sessionUser = await getSessionUser(headers);
   if (!sessionUser) {
     throw new UnauthenticatedError();
   }
   return sessionUser;
 }
 
-export async function requireRole(request: Request, allowed: readonly Role[]): Promise<SessionUser> {
-  const sessionUser = await requireSessionUser(request);
+export async function requireRole(headers: Headers, allowed: readonly Role[]): Promise<SessionUser> {
+  const sessionUser = await requireSessionUser(headers);
   if (!hasRole(sessionUser, allowed)) {
     throw new ForbiddenError(allowed);
   }

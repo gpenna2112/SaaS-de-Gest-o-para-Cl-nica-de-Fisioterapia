@@ -55,6 +55,17 @@ export interface RescheduleSessionInput {
   scheduledEnd: Date;
 }
 
+export interface ListSessionsFilter {
+  rangeStart: Date;
+  rangeEnd: Date;
+  roomId?: string;
+  professionalId?: string;
+}
+
+export interface SessionWithAttendees extends Session {
+  attendees: SessionAttendee[];
+}
+
 /**
  * Todo método aceita uma `tx` externa opcional (último parâmetro) para
  * composição atômica com outros repositórios (ex.: notifications) — ver
@@ -68,6 +79,15 @@ export interface SchedulingRepository {
   addAttendee(sessionId: string, patientId: string, actor: Actor, tx?: Tx): Promise<AddAttendeeResult>;
   rescheduleSession(input: RescheduleSessionInput, actor: Actor, tx?: Tx): Promise<Session>;
   updateAttendeeStatus(attendeeId: string, status: AttendeeStatus, actor: Actor, tx?: Tx): Promise<SessionAttendee>;
+  /**
+   * Leitura simples, sem `SERIALIZABLE` — nenhuma decisão é tomada com base
+   * no resultado, é só para exibição (agenda). Só `sessions` com
+   * `status = 'ativa'`: cancelada nunca aparece na agenda, ela já não
+   * bloqueia sala/horário (ADR-0015). `rangeStart`/`rangeEnd` são genéricos
+   * (sobreposição de intervalo) — a rota é quem traduz "dia" em timezone da
+   * clínica para esse range, este repositório não conhece conceito de dia.
+   */
+  listSessions(filter: ListSessionsFilter, tx?: Tx): Promise<SessionWithAttendees[]>;
 }
 
 /**
@@ -585,6 +605,47 @@ export function createSchedulingRepository(db: DbClient, clinicId: string): Sche
           isolationLevel: "serializable",
         }),
       );
+    },
+
+    async listSessions(filter, tx) {
+      const executor = tx ?? db;
+      const conditions = [
+        eq(sessions.clinicId, clinicId),
+        eq(sessions.status, "ativa"),
+        overlapsRange(sessions.scheduledStart, sessions.scheduledEnd, filter.rangeStart, filter.rangeEnd),
+      ];
+      if (filter.roomId) {
+        conditions.push(eq(sessions.roomId, filter.roomId));
+      }
+      if (filter.professionalId) {
+        conditions.push(eq(sessions.professionalId, filter.professionalId));
+      }
+
+      const sessionRows = await executor
+        .select()
+        .from(sessions)
+        .where(and(...conditions));
+      if (sessionRows.length === 0) {
+        return [];
+      }
+
+      const sessionIds = sessionRows.map((session) => session.id);
+      const attendeeRows = await executor
+        .select()
+        .from(sessionAttendees)
+        .where(and(eq(sessionAttendees.clinicId, clinicId), inArray(sessionAttendees.sessionId, sessionIds)));
+
+      const attendeesBySessionId = new Map<string, SessionAttendee[]>();
+      for (const attendee of attendeeRows) {
+        const list = attendeesBySessionId.get(attendee.sessionId) ?? [];
+        list.push(attendee);
+        attendeesBySessionId.set(attendee.sessionId, list);
+      }
+
+      return sessionRows.map((session) => ({
+        ...session,
+        attendees: attendeesBySessionId.get(session.id) ?? [],
+      }));
     },
   };
 }

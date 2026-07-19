@@ -17,7 +17,8 @@
     "db:migrate": "drizzle-kit migrate",
     "auth:schema:generate": "better-auth generate --config src/modules/auth/better-auth-cli-config.ts --output src/modules/auth/better-auth-schema.ts -y",
     "auth:db:generate": "drizzle-kit generate --config drizzle.auth.config.ts",
-    "auth:db:migrate": "drizzle-kit migrate --config drizzle.auth.config.ts"
+    "auth:db:migrate": "drizzle-kit migrate --config drizzle.auth.config.ts",
+    "db:seed:dev": "node --env-file=.env.local --experimental-loader ./scripts/resolve-ts-hook.mjs scripts/seed-dev.ts"
   },
   "dependencies": {
     "better-auth": "1.6.23",
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "@better-auth/cli": "1.4.21",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -39,6 +41,7 @@
     "eslint-config-next": "16.2.10",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.9.5",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5",
     "vitest": "^4.1.10"
   }

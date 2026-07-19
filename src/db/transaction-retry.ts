@@ -1,5 +1,7 @@
-import { PostgresError } from "postgres";
+import postgres from "postgres";
 import { SchedulingConflictError } from "./repositories/scheduling-repository.errors";
+
+const { PostgresError } = postgres;
 
 const MAX_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 20;
