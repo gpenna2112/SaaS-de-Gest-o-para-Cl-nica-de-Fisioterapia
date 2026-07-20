@@ -50,7 +50,13 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  @theme {
+  /* Sem @theme aqui de propósito: Tailwind v4 extrai @theme em build time e
+     descarta o @media ao redor, fundindo os dois blocos num só :root sem
+     condição (a declaração escura, por vir depois, vencia sempre — mesmo
+     com o SO em modo claro). Uma regra comum, fora de @theme, permanece
+     condicionada ao media query e ainda sobrepõe a camada @layer theme
+     (regra sem @layer sempre vence regra em @layer, por especificação). */
+  :root {
     --color-background: #0a0a0a;
     --color-foreground: #ededed;
     --color-border: #27272a;
