@@ -15,3 +15,9 @@ export const updateAttendeeStatusSchema = z.object({
 export type UpdateAttendeeStatusInput = z.infer<
   typeof updateAttendeeStatusSchema
 >;
+
+export const addAttendeeSchema = z.object({
+  patientId: z.string().uuid({ message: "Paciente inválido." }),
+});
+
+export type AddAttendeeInput = z.infer<typeof addAttendeeSchema>;

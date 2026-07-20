@@ -9,9 +9,9 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
+    <div className="flex min-h-screen flex-col">
       <Nav userName={user.name} />
-      <main className="flex-1 p-4 pb-20 md:pb-4">{children}</main>
+      <main className="flex-1 p-4 pb-20 md:p-6 md:pb-6">{children}</main>
     </div>
   );
 }

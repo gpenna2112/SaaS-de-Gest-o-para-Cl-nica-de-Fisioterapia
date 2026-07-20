@@ -59,6 +59,19 @@ export function addMinutesToTime(time: string, minutes: number): string {
 }
 
 /**
+ * Segunda-feira (ISO) da semana que contém `date` — aritmética pura sobre
+ * componentes de calendário via `Date.UTC`, mesmo padrão de
+ * `addDaysToDateString`. Usada pela grade semanal da agenda.
+ */
+export function getMondayOfWeek(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const utc = new Date(Date.UTC(year!, month! - 1, day!));
+  const isoWeekday = (utc.getUTCDay() + 6) % 7; // 0 = segunda
+  utc.setUTCDate(utc.getUTCDate() - isoWeekday);
+  return utc.toISOString().slice(0, 10);
+}
+
+/**
  * Formata `date` (`AAAA-MM-DD`) por extenso em português, ex. "segunda-feira,
  * 20 de julho" — meio-dia (`-03:00`) evita qualquer risco de a formatação
  * cair no dia anterior/seguinte por causa de fuso na borda da meia-noite.
