@@ -12,6 +12,24 @@ SaaS para clínicas de fisioterapia de pequeno e médio porte que operam **sem r
 
 Pré-requisitos: Node.js 20+, npm e Docker (para o Postgres local).
 
+### Primeira instalação
+
+Em uma máquina nova, o caminho mais rápido é o script de setup — ele checa os pré-requisitos, instala dependências, cria `.env.local` (sem sobrescrever um já existente) e sobe o Postgres local com migrations e seed aplicados:
+
+```powershell
+# Windows (PowerShell)
+.\setup.ps1
+```
+
+```bash
+# macOS / Linux
+./setup.sh
+```
+
+Guia completo (incluindo o passo a passo manual equivalente e solução de problemas) em [`docs/SETUP.md`](docs/SETUP.md).
+
+### Passo a passo manual
+
 ```bash
 npm install
 
