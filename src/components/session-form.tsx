@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,10 @@ export function SessionForm({
   const [date, setDate] = useState(initialDate);
   const [startTime, setStartTime] = useState(DEFAULT_START_TIME);
   const [endTime, setEndTime] = useState(() => addMinutesToTime(DEFAULT_START_TIME, defaultDurationMinutes));
+  // Enquanto o usuário não mexe no término manualmente, ele acompanha o
+  // início (+ duração padrão). Assim que ele edita o término uma vez, para
+  // de seguir — nunca sobrescreve uma escolha explícita.
+  const [endTimeTouched, setEndTimeTouched] = useState(false);
   const [patientIds, setPatientIds] = useState<string[]>([]);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -68,6 +73,18 @@ export function SessionForm({
     setRoomId(newRoomId);
     const newCapacity = rooms.find((room) => room.id === newRoomId)?.capacity ?? 1;
     setPatientIds((current) => current.slice(0, newCapacity));
+  }
+
+  function handleStartTimeChange(newStartTime: string) {
+    setStartTime(newStartTime);
+    if (!endTimeTouched) {
+      setEndTime(addMinutesToTime(newStartTime, defaultDurationMinutes));
+    }
+  }
+
+  function handleEndTimeChange(newEndTime: string) {
+    setEndTime(newEndTime);
+    setEndTimeTouched(true);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -153,7 +170,7 @@ export function SessionForm({
           label="Início"
           type="time"
           value={startTime}
-          onChange={(event) => setStartTime(event.target.value)}
+          onChange={(event) => handleStartTimeChange(event.target.value)}
           error={fieldErrors.scheduledStart}
         />
         <Input
@@ -161,7 +178,7 @@ export function SessionForm({
           label="Término"
           type="time"
           value={endTime}
-          onChange={(event) => setEndTime(event.target.value)}
+          onChange={(event) => handleEndTimeChange(event.target.value)}
           error={fieldErrors.scheduledEnd}
         />
       </div>
@@ -175,9 +192,14 @@ export function SessionForm({
         {fieldErrors.patientIds ? <p className="mt-1 text-sm text-danger">{fieldErrors.patientIds}</p> : null}
       </div>
       {formError ? <p className="text-sm text-danger">{formError}</p> : null}
-      <Button type="submit" disabled={isPending}>
-        {isPending ? "Criando..." : "Criar sessão"}
-      </Button>
+      <div className="flex items-center gap-4">
+        <Button type="submit" disabled={isPending}>
+          {isPending ? "Criando..." : "Criar sessão"}
+        </Button>
+        <Link href={`/agenda?date=${date}`} className="text-sm text-muted-foreground hover:text-foreground">
+          Cancelar
+        </Link>
+      </div>
     </form>
   );
 }

@@ -1,5 +1,4 @@
 import { headers } from "next/headers";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDb } from "@/app/_lib/db";
 import { createClinicsRepository } from "@/db/repositories/clinics-repository";
@@ -8,6 +7,7 @@ import { createRoomsRepository } from "@/db/repositories/rooms-repository";
 import { createSchedulingRepository } from "@/db/repositories/scheduling-repository";
 import { AgendaGrid } from "@/components/agenda-grid";
 import { DateNav } from "@/components/date-nav";
+import { LinkButton } from "@/components/ui/link-button";
 import { getSessionUser } from "@/modules/auth/session";
 import {
   dayRangeInSaoPaulo,
@@ -58,12 +58,7 @@ export default async function AgendaPage({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold">Agenda</h1>
-        <Link
-          href={`/agenda/nova?date=${date}`}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-        >
-          Nova sessão
-        </Link>
+        <LinkButton href={`/agenda/nova?date=${date}`}>Nova sessão</LinkButton>
       </div>
       <DateNav date={date} />
       <AgendaGrid

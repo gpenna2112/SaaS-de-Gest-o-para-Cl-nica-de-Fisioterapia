@@ -4,6 +4,7 @@ import {
   addMinutesToTime,
   combineDateAndTimeInSaoPaulo,
   dayRangeInSaoPaulo,
+  formatDateLongPtBr,
   todayInSaoPaulo,
 } from "./day-range";
 
@@ -75,5 +76,19 @@ describe("addMinutesToTime", () => {
 
   it("delta negativo subtrai minutos", () => {
     expect(addMinutesToTime("13:30", -50)).toBe("12:40");
+  });
+});
+
+describe("formatDateLongPtBr", () => {
+  it("formata por extenso em português, com dia da semana", () => {
+    expect(formatDateLongPtBr("2026-07-20")).toBe("segunda-feira, 20 de julho");
+  });
+
+  it("formata corretamente uma data em outro mês/ano", () => {
+    expect(formatDateLongPtBr("2027-01-01")).toBe("sexta-feira, 1 de janeiro");
+  });
+
+  it("lança RangeError para uma data em formato inválido", () => {
+    expect(() => formatDateLongPtBr("não-é-uma-data")).toThrow(RangeError);
   });
 });

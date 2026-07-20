@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   addDaysToDateString,
+  formatDateLongPtBr,
   todayInSaoPaulo,
 } from "@/modules/scheduling/day-range";
 
@@ -29,7 +30,7 @@ export function DateNav({ date }: { date: string }) {
       >
         Próximo
       </Link>
-      <span className="ml-2 text-sm text-muted-foreground">{date}</span>
+      <span className="ml-2 text-sm text-muted-foreground">{formatDateLongPtBr(date)}</span>
     </div>
   );
 }

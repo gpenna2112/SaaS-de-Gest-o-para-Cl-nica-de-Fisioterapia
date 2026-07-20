@@ -57,3 +57,21 @@ export function addMinutesToTime(time: string, minutes: number): string {
   const wrappedMinute = totalMinutes % 60;
   return `${String(wrappedHour).padStart(2, "0")}:${String(wrappedMinute).padStart(2, "0")}`;
 }
+
+/**
+ * Formata `date` (`AAAA-MM-DD`) por extenso em português, ex. "segunda-feira,
+ * 20 de julho" — meio-dia (`-03:00`) evita qualquer risco de a formatação
+ * cair no dia anterior/seguinte por causa de fuso na borda da meia-noite.
+ */
+export function formatDateLongPtBr(date: string): string {
+  const instant = new Date(`${date}T12:00:00${SAO_PAULO_OFFSET}`);
+  if (Number.isNaN(instant.getTime())) {
+    throw new RangeError(`Data inválida: ${date}`);
+  }
+  return new Intl.DateTimeFormat("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "America/Sao_Paulo",
+  }).format(instant);
+}

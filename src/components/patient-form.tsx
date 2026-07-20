@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
@@ -103,9 +104,14 @@ export function PatientForm({
         error={fieldErrors.phone}
       />
       {formError ? <p className="text-sm text-danger">{formError}</p> : null}
-      <Button type="submit" disabled={isPending}>
-        {isPending ? "Salvando..." : "Salvar"}
-      </Button>
+      <div className="flex items-center gap-4">
+        <Button type="submit" disabled={isPending}>
+          {isPending ? "Salvando..." : "Salvar"}
+        </Button>
+        <Link href="/pacientes" className="text-sm text-muted-foreground hover:text-foreground">
+          Cancelar
+        </Link>
+      </div>
     </form>
   );
 }
