@@ -1,14 +1,52 @@
 @import "tailwindcss";
 
 @theme {
+  /* Marca Espaço Fisio — aliases exatos (pixel-perfect), ver docs/ui/DESIGN_SYSTEM.md §5 */
+  --color-coral-brand: #de9a99;
+  --color-teal-brand: #87bfb8;
+
+  /* Marca — Coral */
+  --color-coral-50: #faf0f0;
+  --color-coral-100: #f5e0e0;
+  --color-coral-200: #ebc2c1;
+  --color-coral-300: #df9c9b;
+  --color-coral-400: #d27674;
+  --color-coral-500: #c64f4e;
+  --color-coral-600: #aa3937;
+  --color-coral-700: #8b2e2d;
+  --color-coral-800: #6c2423;
+  --color-coral-900: #4d1a19;
+  --color-coral-950: #361211;
+
+  /* Marca — Teal / sálvia */
+  --color-teal-50: #f2f8f7;
+  --color-teal-100: #e4f1ef;
+  --color-teal-200: #cae3e0;
+  --color-teal-300: #a9d1cc;
+  --color-teal-400: #87bfb8;
+  --color-teal-500: #66ada4;
+  --color-teal-600: #4e928a;
+  --color-teal-700: #407871;
+  --color-teal-800: #325d58;
+  --color-teal-900: #23433f;
+  --color-teal-950: #192f2c;
+
+  /* Papéis semânticos */
   --color-background: #ffffff;
   --color-foreground: #171717;
   --color-border: #e5e7eb;
-  --color-primary: #0f766e;
+  --color-input-border: #919191;
+  --color-ring: var(--color-teal-600);
+  --color-primary: var(--color-teal-700);
   --color-primary-foreground: #ffffff;
+  --color-accent: var(--color-coral-600);
+  --color-accent-foreground: #ffffff;
   --color-muted: #f3f4f6;
   --color-muted-foreground: #6b7280;
   --color-danger: #dc2626;
+  --color-danger-foreground: #ffffff;
+  --color-warning: #fef3c7;
+  --color-warning-foreground: #92400e;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -16,8 +54,18 @@
     --color-background: #0a0a0a;
     --color-foreground: #ededed;
     --color-border: #27272a;
+    --color-input-border: #5d5d5d;
+    --color-ring: var(--color-teal-400);
+    --color-primary: var(--color-teal-400);
+    --color-primary-foreground: #0a0a0a;
+    --color-accent: var(--color-coral-400);
+    --color-accent-foreground: #0a0a0a;
     --color-muted: #18181b;
     --color-muted-foreground: #a1a1aa;
+    --color-danger: #f87171;
+    --color-danger-foreground: #0a0a0a;
+    --color-warning: #451a03;
+    --color-warning-foreground: #fcd34d;
   }
 }
 
