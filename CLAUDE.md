@@ -54,3 +54,29 @@ Mudanças de arquitetura exigem um novo ADR em `docs/adr/` (numeração sequenci
 
 - Documentação e textos de UI em português (pt-BR); código (identificadores, comentários) em inglês.
 - Datas/horas sempre com timezone explícito; a clínica opera em `America/Sao_Paulo`.
+
+## Autonomia de execução
+
+Para tarefas de baixo risco, execute sem pedir confirmação intermediária.
+
+Pode fazer automaticamente:
+- ler e editar arquivos dentro deste repositório;
+- criar ou remover arquivos temporários;
+- executar lint, typecheck e testes;
+- usar Playwright na aplicação local;
+- iniciar e encerrar o servidor de desenvolvimento;
+- consultar Git status e diff;
+- adicionar ao stage apenas os arquivos explicitamente relacionados à tarefa.
+
+Não peça confirmação entre cada etapa. Execute a tarefa completa e apresente o resultado ao final.
+
+Ainda exigir confirmação antes de:
+- commit;
+- push;
+- alterações destrutivas de banco;
+- exclusão de dados reais;
+- mudança de migrations já aplicadas;
+- instalação ou remoção de dependências;
+- alteração de secrets ou variáveis de produção;
+- comandos fora deste repositório;
+- ações com sudo.
