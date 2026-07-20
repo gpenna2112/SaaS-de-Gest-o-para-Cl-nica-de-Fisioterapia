@@ -256,11 +256,12 @@ export function AgendaView({
   function EmptySlot({ roomId, hour }: { roomId: string; hour: number }) {
     const label = formatSlotLabel(hour);
     const endLabel = formatSlotLabel(hour + slotMinutes);
+    const roomName = roomOf(roomId).name;
     return (
       <button
         type="button"
         onClick={() => setPanel({ mode: "create", roomId, hour })}
-        aria-label={`Nova sessão às ${label}–${endLabel}`}
+        aria-label={`Nova sessão em ${roomName}, ${label}–${endLabel}`}
         className="group flex h-full w-full items-center justify-center rounded-md border border-dashed border-input-border text-muted-foreground/70 hover:bg-muted hover:text-foreground"
       >
         <span className="text-lg font-extralight group-hover:hidden">+</span>

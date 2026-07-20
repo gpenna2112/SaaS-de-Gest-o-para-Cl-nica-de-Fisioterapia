@@ -27,6 +27,7 @@ export default async function NewPatientPage() {
           id: professional.id,
           name: professional.name,
         }))}
+        currentProfessionalId={sessionUser.professionalId}
       />
     </div>
   );

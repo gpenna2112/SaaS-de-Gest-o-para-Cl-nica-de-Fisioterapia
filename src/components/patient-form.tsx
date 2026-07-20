@@ -20,13 +20,20 @@ type FieldErrors = Partial<
 
 export function PatientForm({
   professionals,
+  currentProfessionalId,
 }: {
   professionals: ProfessionalOption[];
+  /** Profissional logado — pré-selecionado por ser o caso mais comum (mesmo
+   * padrão de `session-panel.tsx`), se ele estiver entre os ativos da clínica. */
+  currentProfessionalId?: string;
 }) {
   const router = useRouter();
-  const [primaryProfessionalId, setPrimaryProfessionalId] = useState(
-    professionals[0]?.id ?? "",
-  );
+  const defaultProfessionalId = professionals.some(
+    (professional) => professional.id === currentProfessionalId,
+  )
+    ? currentProfessionalId!
+    : (professionals[0]?.id ?? "");
+  const [primaryProfessionalId, setPrimaryProfessionalId] = useState(defaultProfessionalId);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
