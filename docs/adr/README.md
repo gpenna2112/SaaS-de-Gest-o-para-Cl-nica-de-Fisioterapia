@@ -23,6 +23,7 @@ Registro das decisões arquiteturais do projeto: contexto, alternativas consider
 | [0015](0015-modelo-participacao-session-attendees.md) | Modelo de participação: `session_attendees`, conflito de sala/profissional, cancelamento em cascata | Aceito |
 | [0016](0016-notifications-outbox-session-attendee.md) | Notifications: vínculo por `session_attendee`, idempotência, atomicidade com `scheduling` | Aceito |
 | [0017](0017-auth-escopo-provisionamento-autorizacao.md) | Auth: escopo do Better Auth, provisionamento, autorização por rota, sem FK para `user` | Aceito |
+| [0018](0018-design-system-hibrido-shadcn.md) | Design system: manter componentes próprios; shadcn/ui só sob demanda, de forma híbrida | Aceito |
 
 ## Formato
 

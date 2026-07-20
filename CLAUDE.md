@@ -19,6 +19,7 @@ SaaS de gestão para clínicas de fisioterapia sem recepcionista. MVP = agenda u
 1. `docs/prd.md` — requisitos, escopo do MVP, roadmap das fases 2–5, riscos
 2. `docs/architecture.md` — arquitetura consolidada, módulos e estrutura planejada do código
 3. `docs/adr/` — decisões arquiteturais individuais com alternativas e justificativas
+4. `docs/development/MCP_GUIDE.md` — para qual servidor MCP usar em cada tipo de tarefa (filesystem, GitHub, Postgres, Playwright, Figma, Context7, Google Drive)
 
 ## Arquitetura aprovada (resumo operacional)
 
