@@ -2,14 +2,26 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PatientMultiselect, type PatientOption } from "@/components/patient-multiselect";
 import { getApiErrorMessage } from "@/lib/api-client";
+import {
+  addMinutesToTime,
+  combineDateAndTimeInSaoPaulo,
+  formatDateSaoPaulo,
+  formatTimeSaoPaulo,
+} from "@/modules/scheduling/day-range";
 import { isValidStatusTransition, type AttendeeStatus } from "@/modules/scheduling/session-state-machine";
 import type { SessionAttendeeView, SessionView } from "@/modules/scheduling/session-view";
 
 export interface ProfessionalOption {
+  id: string;
+  name: string;
+}
+
+export interface RoomOption {
   id: string;
   name: string;
 }
@@ -69,22 +81,31 @@ export function SessionPanel({
   state,
   professionals,
   patients,
+  rooms,
+  slotMinutes,
   defaultProfessionalId,
   onClose,
   onCreate,
   onSetAttendeeStatus,
   onAddPatient,
   onDeleteSession,
+  onReschedule,
 }: {
   state: PanelState;
   professionals: ProfessionalOption[];
   patients: PatientOption[];
+  rooms: RoomOption[];
+  slotMinutes: number;
   defaultProfessionalId?: string;
   onClose: () => void;
   onCreate: (input: { professionalId: string; patientIds: string[] }) => Promise<void>;
   onSetAttendeeStatus: (attendeeId: string, status: AttendeeStatus) => Promise<void>;
   onAddPatient: (patientId: string) => Promise<void>;
   onDeleteSession: (session: SessionView) => Promise<void>;
+  onReschedule: (
+    session: SessionView,
+    input: { roomId: string; scheduledStart: string; scheduledEnd: string },
+  ) => Promise<void>;
 }) {
   const [professionalId, setProfessionalId] = useState(
     defaultProfessionalId && professionals.some((p) => p.id === defaultProfessionalId)
@@ -97,8 +118,17 @@ export function SessionPanel({
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const isPilates = state.roomType === "pilates";
   const isEdit = state.mode === "edit";
+  const isPilates = state.roomType === "pilates";
+
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleRoomId, setRescheduleRoomId] = useState(() => (isEdit ? state.roomId : ""));
+  const [rescheduleDate, setRescheduleDate] = useState(() =>
+    isEdit ? formatDateSaoPaulo(state.session.scheduledStart) : "",
+  );
+  const [rescheduleTime, setRescheduleTime] = useState(() =>
+    isEdit ? formatTimeSaoPaulo(state.session.scheduledStart) : "",
+  );
 
   const activeAttendees: SessionAttendeeView[] = isEdit
     ? state.session.attendees.filter((attendee) => attendee.status !== "cancelada")
@@ -131,6 +161,17 @@ export function SessionPanel({
       return;
     }
     run("create", () => onCreate({ professionalId, patientIds: ids }));
+  }
+
+  function handleReschedule() {
+    if (!isEdit) return;
+    if (!rescheduleRoomId || !rescheduleDate || !rescheduleTime) {
+      setError("Selecione sala, data e horário para remarcar.");
+      return;
+    }
+    const scheduledStart = combineDateAndTimeInSaoPaulo(rescheduleDate, rescheduleTime);
+    const scheduledEnd = combineDateAndTimeInSaoPaulo(rescheduleDate, addMinutesToTime(rescheduleTime, slotMinutes));
+    run("reschedule", () => onReschedule(state.session, { roomId: rescheduleRoomId, scheduledStart, scheduledEnd }));
   }
 
   return (
@@ -254,6 +295,53 @@ export function SessionPanel({
             </Select>
           )}
         </div>
+
+        {isEdit ? (
+          <div className="flex flex-col gap-2 rounded-md border border-input-border p-3">
+            <button
+              type="button"
+              onClick={() => setRescheduleOpen((current) => !current)}
+              className="flex items-center justify-between text-left text-sm font-semibold text-foreground"
+            >
+              Remarcar sessão
+              <span className="text-xs font-normal text-muted-foreground">{rescheduleOpen ? "▲" : "▼"}</span>
+            </button>
+            {rescheduleOpen ? (
+              <div className="flex flex-col gap-2">
+                <Select value={rescheduleRoomId} onChange={(event) => setRescheduleRoomId(event.target.value)}>
+                  {rooms.map((room) => (
+                    <option key={room.id} value={room.id}>
+                      {room.name}
+                    </option>
+                  ))}
+                </Select>
+                <div className="flex gap-2">
+                  <Input
+                    type="date"
+                    value={rescheduleDate}
+                    onChange={(event) => setRescheduleDate(event.target.value)}
+                    className="flex-1"
+                  />
+                  <Input
+                    type="time"
+                    value={rescheduleTime}
+                    onChange={(event) => setRescheduleTime(event.target.value)}
+                    className="flex-1"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="min-h-11"
+                  disabled={pendingKey === "reschedule"}
+                  onClick={handleReschedule}
+                >
+                  {pendingKey === "reschedule" ? "Remarcando…" : "Confirmar remarcação"}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {error ? <p className="text-sm text-danger">{error}</p> : null}
 

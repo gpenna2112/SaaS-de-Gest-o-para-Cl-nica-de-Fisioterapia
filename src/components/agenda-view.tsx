@@ -219,6 +219,14 @@ export function AgendaView({
     await withRefresh(() => post(`/api/v1/sessions/${panel.sessionId}/attendees`, { patientId }));
   }
 
+  async function handleReschedule(
+    session: SessionView,
+    input: { roomId: string; scheduledStart: string; scheduledEnd: string },
+  ) {
+    await withRefresh(() => patch(`/api/v1/sessions/${session.id}`, input));
+    setPanel(null);
+  }
+
   async function handleDeleteSession(session: SessionView) {
     // Só cancela quem ainda permite a transição (agendada/confirmada) — um
     // attendee já realizada/falta é registro histórico permanente (ADR-0010),
@@ -624,8 +632,11 @@ export function AgendaView({
               state={resolved}
               professionals={professionals}
               patients={patients}
+              rooms={rooms}
+              slotMinutes={slotMinutes}
               defaultProfessionalId={currentProfessionalId}
               onClose={() => setPanel(null)}
+              onReschedule={handleReschedule}
               onCreate={handleCreate}
               onSetAttendeeStatus={handleSetAttendeeStatus}
               onAddPatient={handleAddPatient}
