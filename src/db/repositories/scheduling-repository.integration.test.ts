@@ -683,6 +683,62 @@ describe("SchedulingRepository — listSessions", () => {
   });
 });
 
+describe("SchedulingRepository — listAttendanceHistoryForPatient", () => {
+  let fixture: TestFixture;
+
+  beforeEach(async () => {
+    fixture = await setupClinic();
+  });
+
+  afterEach(async () => {
+    await cleanupClinic(fixture.clinicId);
+  });
+
+  it("retorna o histórico do paciente (qualquer status), mais recente primeiro", async () => {
+    const { clinicId, professionalId, patientIds } = fixture;
+    const room = await createRoom(clinicId, 1);
+    const repo = createSchedulingRepository(db, clinicId);
+
+    const older = await repo.createSession(
+      {
+        professionalId,
+        roomId: room.id,
+        scheduledStart: new Date("2026-09-10T09:00:00-03:00"),
+        scheduledEnd: new Date("2026-09-10T09:50:00-03:00"),
+        patientIds: [patientIds[0]!],
+      },
+      { type: "professional", professionalId },
+    );
+    await repo.updateAttendeeStatus(older.attendees[0]!.id, "realizada", { type: "professional", professionalId });
+
+    const newer = await repo.createSession(
+      {
+        professionalId,
+        roomId: room.id,
+        scheduledStart: new Date("2026-09-11T09:00:00-03:00"),
+        scheduledEnd: new Date("2026-09-11T09:50:00-03:00"),
+        patientIds: [patientIds[0]!],
+      },
+      { type: "professional", professionalId },
+    );
+    await repo.updateAttendeeStatus(newer.attendees[0]!.id, "falta", { type: "professional", professionalId });
+
+    const history = await repo.listAttendanceHistoryForPatient(patientIds[0]!);
+
+    expect(history).toHaveLength(2);
+    expect(history[0]!.attendeeId).toBe(newer.attendees[0]!.id);
+    expect(history[0]!.status).toBe("falta");
+    expect(history[1]!.attendeeId).toBe(older.attendees[0]!.id);
+    expect(history[1]!.status).toBe("realizada");
+  });
+
+  it("paciente sem histórico retorna lista vazia", async () => {
+    const repo = createSchedulingRepository(db, fixture.clinicId);
+    const history = await repo.listAttendanceHistoryForPatient(fixture.patientIds[0]!);
+    expect(history).toEqual([]);
+  });
+});
+
 // Um único afterAll, fora de qualquer describe: `db` é uma conexão módulo-
 // singleton compartilhada por todos os describes deste arquivo — fechá-la
 // dentro do afterAll de cada describe individual encerra a conexão assim

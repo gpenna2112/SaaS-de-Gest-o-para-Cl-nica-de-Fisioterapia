@@ -13,7 +13,12 @@ import {
   formatDateSaoPaulo,
   formatTimeSaoPaulo,
 } from "@/modules/scheduling/day-range";
-import { isValidStatusTransition, type AttendeeStatus } from "@/modules/scheduling/session-state-machine";
+import {
+  ATTENDEE_STATUS_LABELS as STATUS_LABELS,
+  ATTENDEE_STATUS_TONES as STATUS_TONES,
+  isValidStatusTransition,
+  type AttendeeStatus,
+} from "@/modules/scheduling/session-state-machine";
 import type { SessionAttendeeView, SessionView } from "@/modules/scheduling/session-view";
 
 export interface ProfessionalOption {
@@ -25,22 +30,6 @@ export interface RoomOption {
   id: string;
   name: string;
 }
-
-const STATUS_LABELS: Record<string, string> = {
-  agendada: "Agendada",
-  confirmada: "Confirmada",
-  realizada: "Realizada",
-  falta: "Falta",
-  cancelada: "Cancelada",
-};
-
-const STATUS_TONES: Record<string, "neutral" | "success" | "warning" | "danger"> = {
-  agendada: "neutral",
-  confirmada: "success",
-  realizada: "success",
-  falta: "danger",
-  cancelada: "neutral",
-};
 
 const QUICK_ACTIONS: { target: Exclude<AttendeeStatus, "agendada">; label: string; title: string }[] = [
   { target: "realizada", label: "✓", title: "Marcar como realizada" },
@@ -339,8 +328,8 @@ export function SessionPanel({
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate">{attendee.patientName ?? "Paciente"}</span>
                         <div className="flex items-center gap-1.5">
-                          <StatusBadge tone={STATUS_TONES[attendee.status] ?? "neutral"}>
-                            {STATUS_LABELS[attendee.status] ?? attendee.status}
+                          <StatusBadge tone={STATUS_TONES[attendee.status as AttendeeStatus] ?? "neutral"}>
+                            {STATUS_LABELS[attendee.status as AttendeeStatus] ?? attendee.status}
                           </StatusBadge>
                           {targets.map((qa) => (
                             <button

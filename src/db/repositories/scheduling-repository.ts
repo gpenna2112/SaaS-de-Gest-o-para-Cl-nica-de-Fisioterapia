@@ -1,4 +1,4 @@
-import { and, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { isValidStatusTransition, type AttendeeStatus } from "@/modules/scheduling/session-state-machine";
 import type { DbClient, QueryExecutor, Tx } from "../client";
@@ -66,6 +66,16 @@ export interface SessionWithAttendees extends Session {
   attendees: SessionAttendee[];
 }
 
+/** Uma linha do histórico de atendimentos de um paciente — página de detalhe (`/pacientes/[id]`). */
+export interface PatientAttendanceHistoryEntry {
+  attendeeId: string;
+  status: string;
+  scheduledStart: Date;
+  scheduledEnd: Date;
+  roomId: string;
+  professionalId: string;
+}
+
 /**
  * Todo método aceita uma `tx` externa opcional (último parâmetro) para
  * composição atômica com outros repositórios (ex.: notifications) — ver
@@ -97,6 +107,8 @@ export interface SchedulingRepository {
    * de tabela alheia).
    */
   getAttendee(attendeeId: string, tx?: Tx): Promise<SessionAttendee | null>;
+  /** Histórico de atendimentos do paciente (qualquer status, todas as datas), mais recente primeiro. */
+  listAttendanceHistoryForPatient(patientId: string, tx?: Tx): Promise<PatientAttendanceHistoryEntry[]>;
   /**
    * Conta attendees com `status = 'cancelada'` no intervalo, independente do
    * `sessions.status` da turma. Necessário porque `listSessions` só retorna
@@ -677,6 +689,24 @@ export function createSchedulingRepository(db: DbClient, clinicId: string): Sche
       const executor = tx ?? db;
       const attendee = await fetchAttendee(executor, clinicId, attendeeId);
       return attendee ?? null;
+    },
+
+    async listAttendanceHistoryForPatient(patientId, tx) {
+      const executor = tx ?? db;
+      const rows = await executor
+        .select({
+          attendeeId: sessionAttendees.id,
+          status: sessionAttendees.status,
+          scheduledStart: sessions.scheduledStart,
+          scheduledEnd: sessions.scheduledEnd,
+          roomId: sessions.roomId,
+          professionalId: sessions.professionalId,
+        })
+        .from(sessionAttendees)
+        .innerJoin(sessions, eq(sessionAttendees.sessionId, sessions.id))
+        .where(and(eq(sessionAttendees.clinicId, clinicId), eq(sessionAttendees.patientId, patientId)))
+        .orderBy(desc(sessions.scheduledStart));
+      return rows;
     },
 
     async countCancelledAttendees(filter, tx) {

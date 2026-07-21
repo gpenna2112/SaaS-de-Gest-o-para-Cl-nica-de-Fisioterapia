@@ -20,26 +20,16 @@ import {
   getMondayOfWeek,
   minutesSinceMidnightSaoPaulo,
 } from "@/modules/scheduling/day-range";
-import { isValidStatusTransition, type AttendeeStatus } from "@/modules/scheduling/session-state-machine";
+import {
+  ATTENDEE_STATUS_LABELS as STATUS_LABELS,
+  ATTENDEE_STATUS_TONES as STATUS_TONES,
+  isValidStatusTransition,
+  type AttendeeStatus,
+} from "@/modules/scheduling/session-state-machine";
 import type { SessionView } from "@/modules/scheduling/session-view";
 import type { PatientOption } from "@/components/patient-multiselect";
 
 const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
-
-const STATUS_TONES: Record<string, "neutral" | "success" | "warning" | "danger"> = {
-  agendada: "neutral",
-  confirmada: "success",
-  realizada: "success",
-  falta: "danger",
-  cancelada: "neutral",
-};
-const STATUS_LABELS: Record<string, string> = {
-  agendada: "Agendada",
-  confirmada: "Confirmada",
-  realizada: "Realizada",
-  falta: "Falta",
-  cancelada: "Cancelada",
-};
 
 export interface AgendaRoom {
   id: string;
@@ -323,8 +313,8 @@ export function AgendaView({
                 <span className="truncate text-[13px] font-semibold text-foreground">
                   {attendee.patientName ?? "Paciente"}
                 </span>
-                <StatusBadge tone={STATUS_TONES[attendee.status] ?? "neutral"} className="shrink-0">
-                  {STATUS_LABELS[attendee.status] ?? attendee.status}
+                <StatusBadge tone={STATUS_TONES[attendee.status as AttendeeStatus] ?? "neutral"} className="shrink-0">
+                  {STATUS_LABELS[attendee.status as AttendeeStatus] ?? attendee.status}
                 </StatusBadge>
               </span>
             ))}
