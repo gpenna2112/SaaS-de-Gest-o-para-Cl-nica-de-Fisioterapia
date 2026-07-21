@@ -53,12 +53,17 @@ export function dayRangeInSaoPaulo(date: string): { start: Date; end: Date } {
   return { start, end };
 }
 
+/**
+ * Formata qualquer instante como `AAAA-MM-DD` na timezone da clínica —
+ * "sv-SE" formata nativamente nesse formato; truque comum, sem lib nova.
+ */
+export function formatDateSaoPaulo(date: Date): string {
+  return date.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+}
+
 /** "Hoje" na timezone da clínica — nunca a timezone do processo do servidor. */
 export function todayInSaoPaulo(): string {
-  // "sv-SE" formata nativamente como AAAA-MM-DD; truque comum, sem lib nova.
-  return new Date().toLocaleDateString("sv-SE", {
-    timeZone: "America/Sao_Paulo",
-  });
+  return formatDateSaoPaulo(new Date());
 }
 
 /**

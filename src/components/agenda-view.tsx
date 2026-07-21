@@ -14,6 +14,7 @@ import {
   DAY_END_MINUTES,
   DAY_START_MINUTES,
   formatDateLongPtBr,
+  formatDateSaoPaulo,
   formatMinutesAsTime as formatSlotLabel,
   formatTimeSaoPaulo as formatTime,
   getMondayOfWeek,
@@ -120,7 +121,7 @@ export function AgendaView({
     .replace(".", "");
 
   const nowMinutes = minutesSinceMidnightSaoPaulo(now);
-  const todayStr = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo" }).format(now);
+  const todayStr = formatDateSaoPaulo(now);
   const showNowLine = date === todayStr && nowMinutes >= DAY_START_MINUTES && nowMinutes <= DAY_END_MINUTES;
 
   const visibleRooms = filterRoomId ? rooms.filter((room) => room.id === filterRoomId) : rooms;
@@ -409,7 +410,7 @@ export function AgendaView({
           <Link href={`/agenda?date=${nextWeek}`} className="flex h-8 w-8 items-center justify-center rounded-md border border-input-border text-sm hover:bg-muted">
             ›
           </Link>
-          <Link href={`/agenda?date=${new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo" }).format(new Date())}`} className="rounded-md border border-input-border px-3 py-1.5 text-sm font-medium hover:bg-muted">
+          <Link href={`/agenda?date=${formatDateSaoPaulo(new Date())}`} className="rounded-md border border-input-border px-3 py-1.5 text-sm font-medium hover:bg-muted">
             Hoje
           </Link>
         </div>

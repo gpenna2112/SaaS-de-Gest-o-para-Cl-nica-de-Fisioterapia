@@ -32,3 +32,26 @@ export const createSessionSchema = z
   });
 
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
+
+/**
+ * Remarcação: mesma sala/horário livre exigido de uma criação nova, mas sem
+ * `patientIds` — quem participa não muda numa remarcação (ADR-0015/0016).
+ */
+export const rescheduleSessionSchema = z
+  .object({
+    roomId: z.string().uuid({ message: "Selecione uma sala." }),
+    scheduledStart: z
+      .string()
+      .datetime({ offset: true, message: "Data/hora de início inválida." })
+      .transform((value) => new Date(value)),
+    scheduledEnd: z
+      .string()
+      .datetime({ offset: true, message: "Data/hora de término inválida." })
+      .transform((value) => new Date(value)),
+  })
+  .refine((data) => data.scheduledEnd > data.scheduledStart, {
+    message: "O horário de término deve ser depois do início.",
+    path: ["scheduledEnd"],
+  });
+
+export type RescheduleSessionRequest = z.infer<typeof rescheduleSessionSchema>;

@@ -467,6 +467,13 @@ async function rescheduleSessionCore(
     throw new RoomNotFoundError(input.roomId);
   }
 
+  // Remarcar para uma sala menor não pode deixar participantes já ativos
+  // sem vaga — mesma regra de capacidade que `addAttendee` já aplica.
+  const activeAttendeeCount = await countActiveAttendees(tx, clinicId, input.sessionId);
+  if (activeAttendeeCount > room.capacity) {
+    throw new RoomAtCapacityError(input.roomId);
+  }
+
   if (
     await hasActiveRoomConflict(
       tx,
