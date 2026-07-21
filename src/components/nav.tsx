@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { post } from "@/lib/api-client";
 
 const links = [
+  { href: "/dashboard", label: "Dashboard", shortLabel: "Dashboard" },
   { href: "/agenda", label: "Agenda", shortLabel: "Agenda" },
   { href: "/pacientes", label: "Pacientes", shortLabel: "Pacientes" },
   { href: "/equipe", label: "Equipe & Salas", shortLabel: "Equipe" },
