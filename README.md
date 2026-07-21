@@ -6,7 +6,9 @@ SaaS para clínicas de fisioterapia de pequeno e médio porte que operam **sem r
 
 ## Status
 
-**Agenda + notificações + cadastro de pacientes + autenticação implementados.** Arquitetura aprovada e documentada; schema Drizzle (8 tabelas de domínio — uma `session` é a turma, com 1 a `rooms.capacity` pacientes em `session_attendees`; confirmações em `notifications`, vinculadas por `session_attendee` — mais 4 tabelas do Better Auth em histórico de migração separado), os repositórios de `scheduling`, `notifications`, `patients` e `professionals-auth-repository`, e o serviço que compõe scheduling+notifications numa única transação (criar sessão + agendar confirmação, ou nenhum dos dois) — tudo validado contra Postgres real, com testes de concorrência real. Desativar um paciente bloqueia novos agendamentos sem afetar sessões existentes. Autenticação via Better Auth (e-mail/senha, sessão de 60 dias): signup só vincula a um `professional` pré-existente, sem convite por token; `getSessionUser`/`requireSessionUser`/`requireRole` protegem rotas, com `professionals.active` checado a cada requisição. Ver ADR-0015/0016/0017. Nenhuma rota de API além de `/api/auth/[...all]`, nem o módulo `jobs`, implementados ainda.
+**MVP operacional de ponta a ponta: dashboard, agenda com remarcação, CRUD completo de pacientes/fisioterapeutas/salas, evolução clínica mínima e autenticação.** Arquitetura aprovada e documentada; schema Drizzle (9 tabelas de domínio — uma `session` é a turma, com 1 a `rooms.capacity` pacientes em `session_attendees`; confirmações em `notifications`, vinculadas por `session_attendee`; `evolutions` guarda uma nota clínica por atendimento realizado, ADR-0019 — mais 4 tabelas do Better Auth em histórico de migração separado), os repositórios de `scheduling` (inclui remarcação e histórico por paciente), `notifications`, `patients`, `professionals`/`rooms` (create/update/desativar/reativar, não só leitura), `evolutions` e `professionals-auth-repository`, e o serviço que compõe scheduling+notifications numa única transação (criar/remarcar sessão + agendar/reagendar confirmação, ou nenhum dos dois) — tudo validado contra Postgres real, com testes de concorrência real. Desativar um paciente, fisioterapeuta ou sala bloqueia novos agendamentos/uso sem afetar sessões existentes. Autenticação via Better Auth (e-mail/senha, sessão de 60 dias): signup só vincula a um `professional` pré-existente, sem convite por token; `getSessionUser`/`requireSessionUser`/`requireRole` protegem rotas, com `professionals.active` checado a cada requisição — cadastro de equipe/salas é restrito a `role = "gestora"`. Ver ADR-0015/0016/0017/0019.
+
+**O que ainda falta para operar 100% pelo sistema:** o módulo `jobs` (worker de envio real das confirmações por WhatsApp — hoje só existe o outbox, nada é enviado de fato) e a evolução completa do prontuário (fase 3 do PRD, com estados rascunho/revisado/finalizado).
 
 ## Como rodar o projeto
 
@@ -89,7 +91,7 @@ Para parar/retomar o banco entre sessões, sem perder dados: `docker stop clinic
 ```
 src/
   app/            # Next.js App Router: páginas e rotas /api/v1
-  modules/        # Domínio puro (scheduling, patients, notifications, auth) — sem imports de Next.js
+  modules/        # Domínio puro (scheduling, patients, notifications, auth, evolutions) — sem imports de Next.js
   db/             # Schema Drizzle, migrations e client de conexão — ver src/db/README.md
   jobs/           # Jobs pg-boss — ainda vazio, ver src/jobs/README.md
   lib/            # env.ts (variáveis tipadas), logger.ts (pino)
