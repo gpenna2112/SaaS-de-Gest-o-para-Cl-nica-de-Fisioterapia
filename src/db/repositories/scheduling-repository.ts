@@ -1,7 +1,7 @@
 import { and, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { isValidStatusTransition, type AttendeeStatus } from "@/modules/scheduling/session-state-machine";
-import type { DbClient, Tx } from "../client";
+import type { DbClient, QueryExecutor, Tx } from "../client";
 import { auditLog, patients, rooms, sessionAttendees, sessions } from "../schema";
 import { withSerializableRetry } from "../transaction-retry";
 import {
@@ -89,6 +89,15 @@ export interface SchedulingRepository {
    */
   listSessions(filter: ListSessionsFilter, tx?: Tx): Promise<SessionWithAttendees[]>;
   /**
+   * Leitura simples de um attendee — usada pelo módulo `evolutions` (fora
+   * deste módulo) para validar status (`realizada`) e resolver `patientId`
+   * antes de gravar uma evolução clínica, sem que `evolutions` precise
+   * conhecer a tabela `session_attendees` diretamente (ADR-0016: repositórios
+   * de módulos diferentes compõem via chamadas públicas, nunca import direto
+   * de tabela alheia).
+   */
+  getAttendee(attendeeId: string, tx?: Tx): Promise<SessionAttendee | null>;
+  /**
    * Conta attendees com `status = 'cancelada'` no intervalo, independente do
    * `sessions.status` da turma. Necessário porque `listSessions` só retorna
    * `sessions.status = 'ativa'` (ADR-0015): quando o último attendee ativo é
@@ -158,7 +167,7 @@ async function fetchSession(tx: Tx, clinicId: string, sessionId: string) {
   return session;
 }
 
-async function fetchAttendee(tx: Tx, clinicId: string, attendeeId: string) {
+async function fetchAttendee(tx: QueryExecutor, clinicId: string, attendeeId: string) {
   const [attendee] = await tx
     .select()
     .from(sessionAttendees)
@@ -662,6 +671,12 @@ export function createSchedulingRepository(db: DbClient, clinicId: string): Sche
         ...session,
         attendees: attendeesBySessionId.get(session.id) ?? [],
       }));
+    },
+
+    async getAttendee(attendeeId, tx) {
+      const executor = tx ?? db;
+      const attendee = await fetchAttendee(executor, clinicId, attendeeId);
+      return attendee ?? null;
     },
 
     async countCancelledAttendees(filter, tx) {
