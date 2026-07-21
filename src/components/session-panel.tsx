@@ -142,7 +142,12 @@ export function SessionPanel({
             <div className="text-xs font-semibold text-muted-foreground">{state.roomName}</div>
             <div className="text-base font-semibold">{state.dayHourLabel}</div>
           </div>
-          <button type="button" onClick={onClose} className="text-xl leading-none text-muted-foreground hover:text-foreground">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar"
+            className="-mr-2 -mt-2 flex h-11 w-11 items-center justify-center rounded-md text-xl leading-none text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
             ×
           </button>
         </div>
@@ -217,6 +222,7 @@ export function SessionPanel({
                   <Button
                     type="button"
                     variant="secondary"
+                    className="min-h-11"
                     disabled={!addPatientId || pendingKey === "add"}
                     onClick={() =>
                       run("add", async () => {
@@ -252,11 +258,11 @@ export function SessionPanel({
         {error ? <p className="text-sm text-danger">{error}</p> : null}
 
         <div className="mt-2 flex gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" className="min-h-11" onClick={onClose}>
             {isEdit ? "Fechar" : "Cancelar"}
           </Button>
           {!isEdit ? (
-            <Button type="button" disabled={pendingKey === "create"} onClick={handleCreate}>
+            <Button type="button" className="min-h-11" disabled={pendingKey === "create"} onClick={handleCreate}>
               {pendingKey === "create" ? "Criando…" : "Criar sessão"}
             </Button>
           ) : null}
