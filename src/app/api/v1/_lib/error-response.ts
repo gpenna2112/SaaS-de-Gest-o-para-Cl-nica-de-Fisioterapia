@@ -21,6 +21,10 @@ import {
   SessionNotActiveError,
   SessionNotFoundError,
 } from "@/db/repositories/scheduling-repository.errors";
+import {
+  DuplicateProfessionalEmailError,
+  ProfessionalRecordNotFoundError,
+} from "@/db/repositories/professionals-repository.errors";
 import { logger } from "@/lib/logger";
 import {
   ForbiddenError,
@@ -68,7 +72,8 @@ export function errorResponse(error: unknown): NextResponse {
     error instanceof SchedulingPatientNotFoundError ||
     error instanceof RoomNotFoundError ||
     error instanceof SessionAttendeeNotFoundError ||
-    error instanceof SessionNotFoundError
+    error instanceof SessionNotFoundError ||
+    error instanceof ProfessionalRecordNotFoundError
   ) {
     return NextResponse.json({ error: error.message }, { status: 404 });
   }
@@ -86,7 +91,8 @@ export function errorResponse(error: unknown): NextResponse {
     error instanceof SchedulingConflictError ||
     error instanceof InvalidStatusTransitionError ||
     error instanceof SessionNotActiveError ||
-    error instanceof PatientAlreadyAttendingError
+    error instanceof PatientAlreadyAttendingError ||
+    error instanceof DuplicateProfessionalEmailError
   ) {
     return NextResponse.json({ error: error.message }, { status: 409 });
   }
