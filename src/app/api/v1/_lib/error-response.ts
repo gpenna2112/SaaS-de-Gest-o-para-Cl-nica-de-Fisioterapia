@@ -25,6 +25,7 @@ import {
   DuplicateProfessionalEmailError,
   ProfessionalRecordNotFoundError,
 } from "@/db/repositories/professionals-repository.errors";
+import { DuplicateRoomNameError, RoomRecordNotFoundError } from "@/db/repositories/rooms-repository.errors";
 import { logger } from "@/lib/logger";
 import {
   ForbiddenError,
@@ -73,7 +74,8 @@ export function errorResponse(error: unknown): NextResponse {
     error instanceof RoomNotFoundError ||
     error instanceof SessionAttendeeNotFoundError ||
     error instanceof SessionNotFoundError ||
-    error instanceof ProfessionalRecordNotFoundError
+    error instanceof ProfessionalRecordNotFoundError ||
+    error instanceof RoomRecordNotFoundError
   ) {
     return NextResponse.json({ error: error.message }, { status: 404 });
   }
@@ -92,7 +94,8 @@ export function errorResponse(error: unknown): NextResponse {
     error instanceof InvalidStatusTransitionError ||
     error instanceof SessionNotActiveError ||
     error instanceof PatientAlreadyAttendingError ||
-    error instanceof DuplicateProfessionalEmailError
+    error instanceof DuplicateProfessionalEmailError ||
+    error instanceof DuplicateRoomNameError
   ) {
     return NextResponse.json({ error: error.message }, { status: 409 });
   }
