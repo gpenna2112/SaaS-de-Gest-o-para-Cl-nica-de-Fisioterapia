@@ -1,5 +1,43 @@
 const SAO_PAULO_OFFSET = "-03:00";
 
+/** Início/fim do expediente considerado pela grade da agenda e pelo dashboard (07:00–20:00). */
+export const DAY_START_MINUTES = 7 * 60;
+export const DAY_END_MINUTES = 20 * 60;
+
+/**
+ * Minutos desde a meia-noite, na timezone da clínica — usado tanto pela
+ * grade da agenda (linha "agora", ocupação de sala) quanto pelo dashboard
+ * (quem atende agora, próximo horário livre). Extraído para cá para as duas
+ * telas nunca divergirem sobre o que é "agora".
+ */
+export function minutesSinceMidnightSaoPaulo(date: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
+  return hour * 60 + minute;
+}
+
+/** Formata um instante como `HH:MM` na timezone da clínica. */
+export function formatTimeSaoPaulo(date: Date): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+/** Formata um total de minutos desde a meia-noite como `HH:MM` (ex.: slot de grade). */
+export function formatMinutesAsTime(minutes: number): string {
+  const hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
 /**
  * Limites do dia `date` (formato `AAAA-MM-DD`) na timezone da clínica
  * (America/Sao_Paulo — datas sempre com timezone explícito). Offset fixo,

@@ -4,21 +4,25 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Select } from "@/components/ui/select";
+import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SessionPanel, type PanelState, type ProfessionalOption } from "@/components/session-panel";
 import { patch, post } from "@/lib/api-client";
 import {
   addDaysToDateString,
   combineDateAndTimeInSaoPaulo,
+  DAY_END_MINUTES,
+  DAY_START_MINUTES,
   formatDateLongPtBr,
+  formatMinutesAsTime as formatSlotLabel,
+  formatTimeSaoPaulo as formatTime,
   getMondayOfWeek,
+  minutesSinceMidnightSaoPaulo,
 } from "@/modules/scheduling/day-range";
 import { isValidStatusTransition, type AttendeeStatus } from "@/modules/scheduling/session-state-machine";
 import type { SessionView } from "@/modules/scheduling/session-view";
 import type { PatientOption } from "@/components/patient-multiselect";
 
-const DAY_START_MINUTES = 7 * 60;
-const DAY_END_MINUTES = 20 * 60;
 const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
 const STATUS_TONES: Record<string, "neutral" | "success" | "warning" | "danger"> = {
@@ -43,27 +47,6 @@ export interface AgendaRoom {
   capacity: number;
 }
 
-function minutesSinceMidnightSaoPaulo(date: Date): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Sao_Paulo",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
-  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
-  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
-  return hour * 60 + minute;
-}
-function formatTime(date: Date): string {
-  return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(
-    date,
-  );
-}
-function formatSlotLabel(minutes: number): string {
-  const hour = Math.floor(minutes / 60);
-  const minute = minutes % 60;
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-}
 function WhatsAppIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
@@ -80,22 +63,6 @@ function PeopleIcon() {
         d="M17 20v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8 9v-1a4 4 0 0 0-3-3.87M14 3.13a4 4 0 0 1 0 7.75"
       />
     </svg>
-  );
-}
-
-const STAT_CARD_TONES = {
-  primary: "bg-primary/10 text-primary",
-  warning: "bg-warning text-warning-foreground",
-  danger: "bg-danger/10 text-danger",
-  info: "bg-coral-50 text-coral-700",
-} as const;
-
-function StatCard({ tone, value, label }: { tone: keyof typeof STAT_CARD_TONES; value: number; label: string }) {
-  return (
-    <div className={`flex min-w-[6.5rem] flex-1 flex-col items-start gap-0.5 rounded-xl px-3 py-2 sm:flex-none ${STAT_CARD_TONES[tone]}`}>
-      <span className="text-lg font-bold leading-tight">{value}</span>
-      <span className="text-[11px] font-medium opacity-80">{label}</span>
-    </div>
   );
 }
 
