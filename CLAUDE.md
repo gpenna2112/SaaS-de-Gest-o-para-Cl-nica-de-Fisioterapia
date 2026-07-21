@@ -20,6 +20,7 @@ SaaS de gestão para clínicas de fisioterapia sem recepcionista. MVP = agenda u
 2. `docs/architecture.md` — arquitetura consolidada, módulos e estrutura planejada do código
 3. `docs/adr/` — decisões arquiteturais individuais com alternativas e justificativas
 4. `docs/development/MCP_GUIDE.md` — para qual servidor MCP usar em cada tipo de tarefa (filesystem, GitHub, Postgres, Playwright, Figma, Context7, Google Drive)
+5. `docs/ui/DESIGN_SYSTEM.md` e `docs/ui/FRONTEND_RULES.md` — antes de qualquer trabalho de frontend: tokens de marca/acessibilidade e regras gerais de UX/formulários/tabelas/componentes. `FRONTEND_RULES.md` documenta explicitamente que a regra "shadcn antes de qualquer UI" **não** se aplica aqui — segue o híbrido do ADR-0018.
 
 ## Arquitetura aprovada (resumo operacional)
 
