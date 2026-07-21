@@ -64,11 +64,6 @@ function formatSlotLabel(minutes: number): string {
   const minute = minutes % 60;
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
-}
-
 function WhatsAppIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
@@ -316,39 +311,37 @@ export function AgendaView({
 
     return (
       <div
-        className={`z-10 flex items-start gap-1 rounded-md bg-primary/10 p-2 text-xs ${
-          compact ? "h-full w-full" : "absolute inset-x-1 top-1"
+        className={`z-10 flex gap-1 overflow-hidden rounded-md bg-primary/10 p-1.5 text-xs ${
+          compact ? "h-full w-full" : "absolute inset-1"
         }`}
       >
         <button
           type="button"
           onClick={() => setPanel({ mode: "edit", sessionId: session.id, roomId: session.roomId })}
-          className="flex min-w-0 flex-1 flex-col gap-1 text-left"
+          className="flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-hidden text-left"
         >
           {!compact ? (
-            <span className="font-semibold text-muted-foreground">
+            <span className="shrink-0 truncate font-semibold text-muted-foreground">
               {formatTime(session.scheduledStart)}–{formatTime(session.scheduledEnd)}
+              {professional ? ` · ${professional.name}` : ""}
             </span>
           ) : null}
-          {active.map((attendee) => (
-            <span key={attendee.id} className="flex items-center justify-between gap-1">
-              <span className="truncate font-medium">{attendee.patientName ?? "Paciente"}</span>
-              <StatusBadge tone={STATUS_TONES[attendee.status] ?? "neutral"} className="shrink-0">
-                {STATUS_LABELS[attendee.status] ?? attendee.status}
-              </StatusBadge>
-            </span>
-          ))}
-          {!compact && professional ? (
-            <span className="mt-0.5 flex items-center gap-1.5">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[9px] font-bold text-primary">
-                {initials(professional.name)}
+          {/* Lista rola internamente quando não couber (salas com mais de 1
+              paciente, ex. Pilates) — o card em si nunca ultrapassa a célula
+              da agenda, ver inset-1 + overflow-hidden acima. */}
+          <span className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+            {active.map((attendee) => (
+              <span key={attendee.id} className="flex shrink-0 items-center justify-between gap-1">
+                <span className="truncate font-medium">{attendee.patientName ?? "Paciente"}</span>
+                <StatusBadge tone={STATUS_TONES[attendee.status] ?? "neutral"} className="shrink-0">
+                  {STATUS_LABELS[attendee.status] ?? attendee.status}
+                </StatusBadge>
               </span>
-              <span className="truncate text-[11px] text-muted-foreground">{professional.name}</span>
-            </span>
-          ) : null}
+            ))}
+          </span>
         </button>
         {!compact ? (
-          <div className="flex shrink-0 flex-col gap-1">
+          <div className="flex shrink-0 flex-col gap-1 self-start">
             {whatsappHref ? (
               <a
                 href={whatsappHref}
