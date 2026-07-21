@@ -1,15 +1,12 @@
 import { and, eq } from "drizzle-orm";
+import { writeAuditLog, type Actor } from "../audit-log";
 import type { DbClient, QueryExecutor, Tx } from "../client";
-import { auditLog, professionals } from "../schema";
+import { professionals } from "../schema";
 import { DuplicateProfessionalEmailError, ProfessionalRecordNotFoundError } from "./professionals-repository.errors";
 
+export type { Actor };
 export type Professional = typeof professionals.$inferSelect;
 export type ProfessionalRole = "fisioterapeuta" | "gestora";
-
-export interface Actor {
-  type: "professional" | "patient_reply" | "system";
-  professionalId?: string;
-}
 
 export interface ListProfessionalsFilter {
   activeOnly?: boolean;
@@ -87,27 +84,6 @@ async function assertEmailAvailable(
   }
 }
 
-async function writeAuditLog(
-  executor: QueryExecutor,
-  clinicId: string,
-  actor: Actor,
-  action: string,
-  entityId: string,
-  before: unknown,
-  after: unknown,
-): Promise<void> {
-  await executor.insert(auditLog).values({
-    clinicId,
-    actorId: actor.type === "professional" ? (actor.professionalId ?? null) : null,
-    actorType: actor.type,
-    action,
-    entityType: "professional",
-    entityId,
-    before: before as object | null,
-    after: after as object | null,
-  });
-}
-
 async function createProfessionalCore(
   executor: QueryExecutor,
   clinicId: string,
@@ -127,6 +103,7 @@ async function createProfessionalCore(
     clinicId,
     actor,
     "professional.created",
+    "professional",
     professional.id,
     null,
     professionalAuditSnapshot(professional),
@@ -166,6 +143,7 @@ async function updateProfessionalCore(
     clinicId,
     actor,
     "professional.updated",
+    "professional",
     updated.id,
     professionalAuditSnapshot(current),
     professionalAuditSnapshot(updated),
@@ -202,6 +180,7 @@ async function setActiveCore(
     clinicId,
     actor,
     active ? "professional.reactivated" : "professional.deactivated",
+    "professional",
     updated.id,
     professionalAuditSnapshot(current),
     professionalAuditSnapshot(updated),

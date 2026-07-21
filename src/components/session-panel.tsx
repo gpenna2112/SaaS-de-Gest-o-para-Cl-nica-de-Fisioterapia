@@ -40,6 +40,7 @@ const QUICK_ACTIONS: { target: Exclude<AttendeeStatus, "agendada">; label: strin
 interface EvolutionData {
   id: string;
   content: string;
+  professionalId: string;
 }
 
 /**
@@ -47,8 +48,19 @@ interface EvolutionData {
  * resto do painel, fala com a API diretamente em vez de subir callback pro
  * pai (`agenda-view.tsx`) — não muda nada que a grade exiba, então não
  * precisa do `router.refresh()` que as outras mutações disparam.
+ *
+ * Só o autor original edita (backend: `NotEvolutionAuthorError`, 403 — fonte
+ * de verdade). Aqui só refletimos essa regra na UI: se `currentProfessionalId`
+ * não bate com o autor da nota, mostramos texto somente leitura em vez de um
+ * textarea que só falharia ao salvar.
  */
-function EvolutionEditor({ attendeeId }: { attendeeId: string }) {
+function EvolutionEditor({
+  attendeeId,
+  currentProfessionalId,
+}: {
+  attendeeId: string;
+  currentProfessionalId?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -57,6 +69,8 @@ function EvolutionEditor({ attendeeId }: { attendeeId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const isAuthor = !evolution || evolution.professionalId === currentProfessionalId;
 
   // Busca sob demanda no clique (não em efeito) — só precisamos saber se já
   // existe uma evolução na primeira vez que o profissional abre a seção.
@@ -110,12 +124,12 @@ function EvolutionEditor({ attendeeId }: { attendeeId: string }) {
         onClick={handleToggleOpen}
         className="text-left text-xs font-semibold text-primary hover:underline"
       >
-        {open ? "Ocultar evolução" : evolution ? "Ver/editar evolução" : "+ Registrar evolução"}
+        {open ? "Ocultar evolução" : evolution ? (isAuthor ? "Ver/editar evolução" : "Ver evolução") : "+ Registrar evolução"}
       </button>
       {open ? (
         loading ? (
           <p className="text-xs text-muted-foreground">Carregando...</p>
-        ) : (
+        ) : isAuthor ? (
           <div className="flex flex-col gap-1.5">
             <textarea
               value={content}
@@ -138,6 +152,13 @@ function EvolutionEditor({ attendeeId }: { attendeeId: string }) {
             >
               {isSaving ? "Salvando..." : "Salvar evolução"}
             </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            <p className="whitespace-pre-wrap rounded-md border border-input-border bg-background px-2 py-1.5 text-xs text-foreground">
+              {content}
+            </p>
+            <p className="text-xs text-muted-foreground">Só quem registrou esta evolução pode editá-la.</p>
           </div>
         )
       ) : null}
@@ -181,6 +202,7 @@ export function SessionPanel({
   rooms,
   slotMinutes,
   defaultProfessionalId,
+  currentProfessionalId,
   onClose,
   onCreate,
   onSetAttendeeStatus,
@@ -194,6 +216,7 @@ export function SessionPanel({
   rooms: RoomOption[];
   slotMinutes: number;
   defaultProfessionalId?: string;
+  currentProfessionalId?: string;
   onClose: () => void;
   onCreate: (input: { professionalId: string; patientIds: string[] }) => Promise<void>;
   onSetAttendeeStatus: (attendeeId: string, status: AttendeeStatus) => Promise<void>;
@@ -233,8 +256,9 @@ export function SessionPanel({
   const availableToAdd = patients.filter(
     (patient) => !activeAttendees.some((attendee) => attendee.patientId === patient.id),
   );
-  // "Excluir" só cancela quem ainda permite a transição — se todo mundo já
-  // está realizada/falta (registro histórico, ADR-0010), não há o que excluir.
+  // "Cancelar sessão" só cancela quem ainda permite a transição — se todo
+  // mundo já está realizada/falta (registro histórico, ADR-0010), não há
+  // participante ativo para cancelar.
   const canDelete = activeAttendees.some((attendee) =>
     isValidStatusTransition(attendee.status as AttendeeStatus, "cancelada"),
   );
@@ -345,7 +369,9 @@ export function SessionPanel({
                           ))}
                         </div>
                       </div>
-                      {attendee.status === "realizada" ? <EvolutionEditor attendeeId={attendee.id} /> : null}
+                      {attendee.status === "realizada" ? (
+                        <EvolutionEditor attendeeId={attendee.id} currentProfessionalId={currentProfessionalId} />
+                      ) : null}
                     </li>
                   );
                 })}
@@ -462,7 +488,7 @@ export function SessionPanel({
             onClick={() => run("delete", () => onDeleteSession(state.session))}
             className="text-center text-sm font-medium text-danger"
           >
-            {pendingKey === "delete" ? "Excluindo…" : "Excluir sessão"}
+            {pendingKey === "delete" ? "Cancelando…" : "Cancelar sessão"}
           </button>
         ) : null}
       </div>

@@ -1,15 +1,12 @@
 import { and, eq } from "drizzle-orm";
+import { writeAuditLog, type Actor } from "../audit-log";
 import type { DbClient, QueryExecutor, Tx } from "../client";
-import { auditLog, rooms } from "../schema";
+import { rooms } from "../schema";
 import { DuplicateRoomNameError, RoomRecordNotFoundError } from "./rooms-repository.errors";
 
+export type { Actor };
 export type Room = typeof rooms.$inferSelect;
 export type RoomType = "individual" | "pilates";
-
-export interface Actor {
-  type: "professional" | "patient_reply" | "system";
-  professionalId?: string;
-}
 
 export interface ListRoomsFilter {
   activeOnly?: boolean;
@@ -79,27 +76,6 @@ async function assertNameAvailable(
   }
 }
 
-async function writeAuditLog(
-  executor: QueryExecutor,
-  clinicId: string,
-  actor: Actor,
-  action: string,
-  entityId: string,
-  before: unknown,
-  after: unknown,
-): Promise<void> {
-  await executor.insert(auditLog).values({
-    clinicId,
-    actorId: actor.type === "professional" ? (actor.professionalId ?? null) : null,
-    actorType: actor.type,
-    action,
-    entityType: "room",
-    entityId,
-    before: before as object | null,
-    after: after as object | null,
-  });
-}
-
 async function createRoomCore(
   executor: QueryExecutor,
   clinicId: string,
@@ -114,7 +90,7 @@ async function createRoomCore(
     .returning();
   const room = assertRow(inserted, "Insert de sala não retornou linha");
 
-  await writeAuditLog(executor, clinicId, actor, "room.created", room.id, null, roomAuditSnapshot(room));
+  await writeAuditLog(executor, clinicId, actor, "room.created", "room", room.id, null, roomAuditSnapshot(room));
 
   return room;
 }
@@ -150,6 +126,7 @@ async function updateRoomCore(
     clinicId,
     actor,
     "room.updated",
+    "room",
     updated.id,
     roomAuditSnapshot(current),
     roomAuditSnapshot(updated),
@@ -185,6 +162,7 @@ async function setActiveCore(
     clinicId,
     actor,
     active ? "room.reactivated" : "room.deactivated",
+    "room",
     updated.id,
     roomAuditSnapshot(current),
     roomAuditSnapshot(updated),

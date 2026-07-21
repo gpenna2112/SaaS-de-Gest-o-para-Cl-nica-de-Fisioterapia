@@ -1,7 +1,8 @@
 import { and, eq } from "drizzle-orm";
 import { normalizePhone } from "@/modules/patients/phone";
+import { writeAuditLog, type Actor } from "../audit-log";
 import type { DbClient, QueryExecutor, Tx } from "../client";
-import { auditLog, patients, professionals } from "../schema";
+import { patients, professionals } from "../schema";
 import {
   InvalidPhoneError,
   PatientNotFoundError,
@@ -9,12 +10,8 @@ import {
   ProfessionalNotFoundError,
 } from "./patients-repository.errors";
 
+export type { Actor };
 export type Patient = typeof patients.$inferSelect;
-
-export interface Actor {
-  type: "professional" | "patient_reply" | "system";
-  professionalId?: string;
-}
 
 export interface CreatePatientInput {
   primaryProfessionalId: string;
@@ -104,27 +101,6 @@ async function assertActiveProfessional(executor: QueryExecutor, clinicId: strin
   }
 }
 
-async function writeAuditLog(
-  executor: QueryExecutor,
-  clinicId: string,
-  actor: Actor,
-  action: string,
-  entityId: string,
-  before: unknown,
-  after: unknown,
-): Promise<void> {
-  await executor.insert(auditLog).values({
-    clinicId,
-    actorId: actor.type === "professional" ? (actor.professionalId ?? null) : null,
-    actorType: actor.type,
-    action,
-    entityType: "patient",
-    entityId,
-    before: before as object | null,
-    after: after as object | null,
-  });
-}
-
 async function createPatientCore(
   executor: QueryExecutor,
   clinicId: string,
@@ -145,7 +121,16 @@ async function createPatientCore(
     .returning();
   const patient = assertRow(inserted, "Insert de paciente não retornou linha");
 
-  await writeAuditLog(executor, clinicId, actor, "patient.created", patient.id, null, patientAuditSnapshot(patient));
+  await writeAuditLog(
+    executor,
+    clinicId,
+    actor,
+    "patient.created",
+    "patient",
+    patient.id,
+    null,
+    patientAuditSnapshot(patient),
+  );
 
   return patient;
 }
@@ -185,6 +170,7 @@ async function updatePatientCore(
     clinicId,
     actor,
     "patient.updated",
+    "patient",
     updated.id,
     patientAuditSnapshot(current),
     patientAuditSnapshot(updated),
@@ -221,6 +207,7 @@ async function deactivatePatientCore(
     clinicId,
     actor,
     "patient.deactivated",
+    "patient",
     updated.id,
     patientAuditSnapshot(current),
     patientAuditSnapshot(updated),
@@ -256,6 +243,7 @@ async function reactivatePatientCore(
     clinicId,
     actor,
     "patient.reactivated",
+    "patient",
     updated.id,
     patientAuditSnapshot(current),
     patientAuditSnapshot(updated),

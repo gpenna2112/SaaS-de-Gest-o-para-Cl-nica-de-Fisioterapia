@@ -33,7 +33,7 @@
         Adapter WhatsApp ⇄ Meta Cloud API (webhook)
 ```
 
-Monólito modular: um deploy, um banco, transações ACID entre agenda ↔ sessão ↔ (futura) produção. A UI consome a mesma API REST que sistemas externos consumirão. Worker de jobs no mesmo processo Node (separável por configuração quando o volume justificar).
+Monólito modular: um deploy, um banco, transações ACID entre agenda ↔ sessão ↔ (futura) produção. A API REST `/api/v1` é a mesma que sistemas externos usarão quando existirem — hoje, na prática, ela serve só as mutações client-side da própria UI (leitura inicial de página vai direto ao repositório via Server Component, e a autenticação por API key para consumidores externos ainda não foi implementada; ver nota de atualização no [ADR-0004](adr/0004-api-rest-versionada.md)). Worker de jobs no mesmo processo Node (separável por configuração quando o volume justificar).
 
 ## Componentes e decisões
 

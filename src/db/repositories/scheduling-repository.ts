@@ -1,8 +1,9 @@
 import { and, desc, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { isValidStatusTransition, type AttendeeStatus } from "@/modules/scheduling/session-state-machine";
+import { writeAuditLog, type Actor } from "../audit-log";
 import type { DbClient, QueryExecutor, Tx } from "../client";
-import { auditLog, patients, rooms, sessionAttendees, sessions } from "../schema";
+import { patients, rooms, sessionAttendees, sessions } from "../schema";
 import { withSerializableRetry } from "../transaction-retry";
 import {
   DuplicatePatientIdsError,
@@ -25,10 +26,7 @@ export type SessionAttendee = typeof sessionAttendees.$inferSelect;
 /** Status da session em si — `ativa`/`cancelada`. Não confundir com AttendeeStatus (por participante). */
 export type SessionStatus = "ativa" | "cancelada";
 
-export interface Actor {
-  type: "professional" | "patient_reply" | "system";
-  professionalId?: string;
-}
+export type { Actor };
 
 export interface CreateSessionInput {
   professionalId: string;
@@ -274,28 +272,6 @@ async function countActiveAttendees(tx: Tx, clinicId: string, sessionId: string)
       ),
     );
   return row?.count ?? 0;
-}
-
-async function writeAuditLog(
-  tx: Tx,
-  clinicId: string,
-  actor: Actor,
-  action: string,
-  entityType: "session" | "session_attendee",
-  entityId: string,
-  before: unknown,
-  after: unknown,
-): Promise<void> {
-  await tx.insert(auditLog).values({
-    clinicId,
-    actorId: actor.type === "professional" ? (actor.professionalId ?? null) : null,
-    actorType: actor.type,
-    action,
-    entityType,
-    entityId,
-    before: before as object | null,
-    after: after as object | null,
-  });
 }
 
 /**

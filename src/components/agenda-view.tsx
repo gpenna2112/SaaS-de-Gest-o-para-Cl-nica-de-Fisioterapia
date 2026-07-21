@@ -220,7 +220,7 @@ export function AgendaView({
   async function handleDeleteSession(session: SessionView) {
     // Só cancela quem ainda permite a transição (agendada/confirmada) — um
     // attendee já realizada/falta é registro histórico permanente (ADR-0010),
-    // "excluir" não desfaz o que já aconteceu.
+    // "cancelar" não desfaz o que já aconteceu.
     const cancellable = session.attendees.filter((attendee) =>
       isValidStatusTransition(attendee.status as AttendeeStatus, "cancelada"),
     );
@@ -625,6 +625,7 @@ export function AgendaView({
               rooms={rooms}
               slotMinutes={slotMinutes}
               defaultProfessionalId={currentProfessionalId}
+              currentProfessionalId={currentProfessionalId}
               onClose={() => setPanel(null)}
               onReschedule={handleReschedule}
               onCreate={handleCreate}

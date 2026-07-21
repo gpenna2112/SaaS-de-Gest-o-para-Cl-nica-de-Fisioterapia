@@ -1,18 +1,15 @@
 import { and, asc, eq } from "drizzle-orm";
+import { writeAuditLog, type Actor } from "../audit-log";
 import type { DbClient, QueryExecutor, Tx } from "../client";
-import { auditLog, evolutions } from "../schema";
+import { evolutions } from "../schema";
 import {
   EvolutionAlreadyExistsError,
   EvolutionNotFoundError,
   NotEvolutionAuthorError,
 } from "./evolutions-repository.errors";
 
+export type { Actor };
 export type Evolution = typeof evolutions.$inferSelect;
-
-export interface Actor {
-  type: "professional" | "patient_reply" | "system";
-  professionalId?: string;
-}
 
 export interface CreateEvolutionInput {
   sessionAttendeeId: string;
@@ -35,7 +32,6 @@ export interface UpdateEvolutionInput {
 export interface EvolutionsRepository {
   createEvolution(input: CreateEvolutionInput, actor: Actor, tx?: Tx): Promise<Evolution>;
   updateEvolution(evolutionId: string, input: UpdateEvolutionInput, actor: Actor, tx?: Tx): Promise<Evolution>;
-  getEvolution(evolutionId: string, tx?: Tx): Promise<Evolution | null>;
   getBySessionAttendee(sessionAttendeeId: string, tx?: Tx): Promise<Evolution | null>;
   /** Ordem cronológica ascendente (mais antiga primeiro) — histórico de leitura. */
   listByPatient(patientId: string, tx?: Tx): Promise<Evolution[]>;
@@ -75,27 +71,6 @@ async function fetchEvolutionByAttendee(executor: QueryExecutor, clinicId: strin
   return evolution;
 }
 
-async function writeAuditLog(
-  executor: QueryExecutor,
-  clinicId: string,
-  actor: Actor,
-  action: string,
-  entityId: string,
-  before: unknown,
-  after: unknown,
-): Promise<void> {
-  await executor.insert(auditLog).values({
-    clinicId,
-    actorId: actor.type === "professional" ? (actor.professionalId ?? null) : null,
-    actorType: actor.type,
-    action,
-    entityType: "evolution",
-    entityId,
-    before: before as object | null,
-    after: after as object | null,
-  });
-}
-
 async function createEvolutionCore(
   executor: QueryExecutor,
   clinicId: string,
@@ -121,7 +96,16 @@ async function createEvolutionCore(
     .returning();
   const evolution = assertRow(inserted, "Insert de evolução não retornou linha");
 
-  await writeAuditLog(executor, clinicId, actor, "evolution.created", evolution.id, null, evolutionAuditSnapshot(evolution));
+  await writeAuditLog(
+    executor,
+    clinicId,
+    actor,
+    "evolution.created",
+    "evolution",
+    evolution.id,
+    null,
+    evolutionAuditSnapshot(evolution),
+  );
 
   return evolution;
 }
@@ -154,6 +138,7 @@ async function updateEvolutionCore(
     clinicId,
     actor,
     "evolution.updated",
+    "evolution",
     updated.id,
     evolutionAuditSnapshot(current),
     evolutionAuditSnapshot(updated),
@@ -176,11 +161,6 @@ export function createEvolutionsRepository(db: DbClient, clinicId: string): Evol
         return updateEvolutionCore(externalTx, clinicId, evolutionId, input, actor);
       }
       return db.transaction((tx) => updateEvolutionCore(tx, clinicId, evolutionId, input, actor));
-    },
-
-    async getEvolution(evolutionId, tx) {
-      const evolution = await fetchEvolutionById(tx ?? db, clinicId, evolutionId);
-      return evolution ?? null;
     },
 
     async getBySessionAttendee(sessionAttendeeId, tx) {

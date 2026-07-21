@@ -10,6 +10,8 @@ SaaS para clínicas de fisioterapia de pequeno e médio porte que operam **sem r
 
 **O que ainda falta para operar 100% pelo sistema:** o módulo `jobs` (worker de envio real das confirmações por WhatsApp — hoje só existe o outbox, nada é enviado de fato) e a evolução completa do prontuário (fase 3 do PRD, com estados rascunho/revisado/finalizado).
 
+**Dívida técnica conhecida e aceita:** `team-editor.tsx`, `rooms-editor.tsx` e `patient-edit-form.tsx` repetem a mesma estrutura de formulário (criação colapsável + edição + toggle ativo) quase linha a linha, sem abstração compartilhada — deliberado por ora, dado o tamanho atual do projeto (três casos ainda são melhor que uma abstração prematura). Revisitar se um quarto CRUD desse tipo aparecer.
+
 ## Como rodar o projeto
 
 Pré-requisitos: Node.js 20+, npm e Docker (para o Postgres local).
