@@ -311,7 +311,7 @@ export function AgendaView({
 
     return (
       <div
-        className={`z-10 flex gap-1 overflow-hidden rounded-md bg-primary/10 p-1.5 text-xs ${
+        className={`z-10 flex gap-1 overflow-hidden rounded-md border border-primary/25 bg-primary/10 p-1.5 text-xs ${
           compact ? "h-full w-full" : "absolute inset-1"
         }`}
       >
@@ -320,10 +320,22 @@ export function AgendaView({
           onClick={() => setPanel({ mode: "edit", sessionId: session.id, roomId: session.roomId })}
           className="flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-hidden text-left"
         >
+          {/* Ordem de prioridade quando o espaço é curto: horário > paciente
+              (informação principal) > fisioterapeuta (bem visível, em pill
+              colorida) > status (badge, o primeiro a ser sacrificado). */}
           {!compact ? (
-            <span className="shrink-0 truncate font-semibold text-muted-foreground">
-              {formatTime(session.scheduledStart)}–{formatTime(session.scheduledEnd)}
-              {professional ? ` · ${professional.name}` : ""}
+            <span className="flex shrink-0 items-center justify-between gap-1">
+              {/* Só o horário final: o inicial já é a própria linha da grade
+                  onde o card começa — repetir os dois é redundante e disputa
+                  espaço com paciente/fisioterapeuta, que importam mais aqui. */}
+              <span className="shrink-0 truncate text-[10px] font-medium text-muted-foreground">
+                até {formatTime(session.scheduledEnd)}
+              </span>
+              {professional ? (
+                <span className="min-w-0 truncate rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                  {professional.name}
+                </span>
+              ) : null}
             </span>
           ) : null}
           {/* Lista rola internamente quando não couber (salas com mais de 1
@@ -332,7 +344,9 @@ export function AgendaView({
           <span className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
             {active.map((attendee) => (
               <span key={attendee.id} className="flex shrink-0 items-center justify-between gap-1">
-                <span className="truncate font-medium">{attendee.patientName ?? "Paciente"}</span>
+                <span className="truncate text-[13px] font-semibold text-foreground">
+                  {attendee.patientName ?? "Paciente"}
+                </span>
                 <StatusBadge tone={STATUS_TONES[attendee.status] ?? "neutral"} className="shrink-0">
                   {STATUS_LABELS[attendee.status] ?? attendee.status}
                 </StatusBadge>
