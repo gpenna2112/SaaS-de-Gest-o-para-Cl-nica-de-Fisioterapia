@@ -8,6 +8,21 @@ import { requireSessionUser } from "@/modules/auth/session";
 import { errorResponse } from "../../../_lib/error-response";
 import { parseJsonBody } from "../../../_lib/parse-json-body";
 
+/** Usada pelo painel da sessão para saber se já existe evolução (criar vs. editar). */
+export async function GET(request: Request, { params }: { params: Promise<{ attendeeId: string }> }) {
+  try {
+    const sessionUser = await requireSessionUser(request.headers);
+    const { attendeeId } = await params;
+
+    const evolutionsRepository = createEvolutionsRepository(getDb(), sessionUser.clinicId);
+    const evolution = await evolutionsRepository.getBySessionAttendee(attendeeId);
+
+    return NextResponse.json({ evolution });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
 /**
  * Registrar evolução após o atendimento (ADR-0019). A validação de que o
  * attendee existe e está `realizada` compõe com `scheduling-repository` na

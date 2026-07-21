@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PatientMultiselect, type PatientOption } from "@/components/patient-multiselect";
-import { getApiErrorMessage } from "@/lib/api-client";
+import { get, getApiErrorMessage, patch as apiPatch, post as apiPost } from "@/lib/api-client";
 import {
   addMinutesToTime,
   combineDateAndTimeInSaoPaulo,
@@ -47,6 +47,114 @@ const QUICK_ACTIONS: { target: Exclude<AttendeeStatus, "agendada">; label: strin
   { target: "falta", label: "⊘", title: "Marcar falta" },
   { target: "cancelada", label: "✕", title: "Cancelar" },
 ];
+
+interface EvolutionData {
+  id: string;
+  content: string;
+}
+
+/**
+ * Registro de evolução (ADR-0019) por atendimento `realizada`. Diferente do
+ * resto do painel, fala com a API diretamente em vez de subir callback pro
+ * pai (`agenda-view.tsx`) — não muda nada que a grade exiba, então não
+ * precisa do `router.refresh()` que as outras mutações disparam.
+ */
+function EvolutionEditor({ attendeeId }: { attendeeId: string }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [evolution, setEvolution] = useState<EvolutionData | null>(null);
+  const [content, setContent] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  // Busca sob demanda no clique (não em efeito) — só precisamos saber se já
+  // existe uma evolução na primeira vez que o profissional abre a seção.
+  async function handleToggleOpen() {
+    const willOpen = !open;
+    setOpen(willOpen);
+    if (!willOpen || loaded) return;
+    setLoading(true);
+    try {
+      const result = await get<{ evolution: EvolutionData | null }>(
+        `/api/v1/session-attendees/${attendeeId}/evolution`,
+      );
+      if (result.evolution) {
+        setEvolution(result.evolution);
+        setContent(result.evolution.content);
+      }
+      setLoaded(true);
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Não foi possível carregar a evolução."));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSave() {
+    setError(null);
+    setSaved(false);
+    setIsSaving(true);
+    try {
+      if (evolution) {
+        const result = await apiPatch<{ evolution: EvolutionData }>(`/api/v1/evolutions/${evolution.id}`, { content });
+        setEvolution(result.evolution);
+      } else {
+        const result = await apiPost<{ evolution: EvolutionData }>(`/api/v1/session-attendees/${attendeeId}/evolution`, {
+          content,
+        });
+        setEvolution(result.evolution);
+      }
+      setSaved(true);
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Não foi possível salvar a evolução."));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-md bg-muted/50 p-2">
+      <button
+        type="button"
+        onClick={handleToggleOpen}
+        className="text-left text-xs font-semibold text-primary hover:underline"
+      >
+        {open ? "Ocultar evolução" : evolution ? "Ver/editar evolução" : "+ Registrar evolução"}
+      </button>
+      {open ? (
+        loading ? (
+          <p className="text-xs text-muted-foreground">Carregando...</p>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            <textarea
+              value={content}
+              onChange={(event) => {
+                setContent(event.target.value);
+                setSaved(false);
+              }}
+              rows={3}
+              placeholder="Como foi o atendimento..."
+              className="rounded-md border border-input-border bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+            />
+            {error ? <p className="text-xs text-danger">{error}</p> : null}
+            {saved ? <p className="text-xs text-primary">Salvo.</p> : null}
+            <Button
+              type="button"
+              variant="secondary"
+              className="min-h-8 w-fit px-3 py-1 text-xs"
+              disabled={isSaving || content.trim() === ""}
+              onClick={handleSave}
+            >
+              {isSaving ? "Salvando..." : "Salvar evolução"}
+            </Button>
+          </div>
+        )
+      ) : null}
+    </div>
+  );
+}
 
 function quickActionButtonClass(active: boolean) {
   return `flex h-7 w-7 items-center justify-center rounded-md border text-sm ${
@@ -227,25 +335,28 @@ export function SessionPanel({
                     isValidStatusTransition(attendee.status as AttendeeStatus, qa.target),
                   );
                   return (
-                    <li key={attendee.id} className="flex items-center justify-between gap-2 text-sm">
-                      <span className="truncate">{attendee.patientName ?? "Paciente"}</span>
-                      <div className="flex items-center gap-1.5">
-                        <StatusBadge tone={STATUS_TONES[attendee.status] ?? "neutral"}>
-                          {STATUS_LABELS[attendee.status] ?? attendee.status}
-                        </StatusBadge>
-                        {targets.map((qa) => (
-                          <button
-                            key={qa.target}
-                            type="button"
-                            title={qa.title}
-                            disabled={pendingKey === attendee.id}
-                            className={quickActionButtonClass(false)}
-                            onClick={() => run(attendee.id, () => onSetAttendeeStatus(attendee.id, qa.target))}
-                          >
-                            {qa.label}
-                          </button>
-                        ))}
+                    <li key={attendee.id} className="flex flex-col gap-1.5 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate">{attendee.patientName ?? "Paciente"}</span>
+                        <div className="flex items-center gap-1.5">
+                          <StatusBadge tone={STATUS_TONES[attendee.status] ?? "neutral"}>
+                            {STATUS_LABELS[attendee.status] ?? attendee.status}
+                          </StatusBadge>
+                          {targets.map((qa) => (
+                            <button
+                              key={qa.target}
+                              type="button"
+                              title={qa.title}
+                              disabled={pendingKey === attendee.id}
+                              className={quickActionButtonClass(false)}
+                              onClick={() => run(attendee.id, () => onSetAttendeeStatus(attendee.id, qa.target))}
+                            >
+                              {qa.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
+                      {attendee.status === "realizada" ? <EvolutionEditor attendeeId={attendee.id} /> : null}
                     </li>
                   );
                 })}
