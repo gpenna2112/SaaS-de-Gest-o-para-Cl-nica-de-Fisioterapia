@@ -48,6 +48,7 @@ export interface PatientsRepository {
   listPatients(filter: ListPatientsFilter, tx?: Tx): Promise<Patient[]>;
   updatePatient(patientId: string, input: UpdatePatientInput, actor: Actor, tx?: Tx): Promise<Patient>;
   deactivatePatient(patientId: string, actor: Actor, tx?: Tx): Promise<Patient>;
+  reactivatePatient(patientId: string, actor: Actor, tx?: Tx): Promise<Patient>;
 }
 
 function assertRow<T>(row: T | undefined, message: string): T {
@@ -228,6 +229,41 @@ async function deactivatePatientCore(
   return updated;
 }
 
+async function reactivatePatientCore(
+  executor: QueryExecutor,
+  clinicId: string,
+  patientId: string,
+  actor: Actor,
+): Promise<Patient> {
+  const current = await fetchPatient(executor, clinicId, patientId);
+  if (!current) {
+    throw new PatientNotFoundError([patientId]);
+  }
+  // Idempotente, espelhando deactivatePatientCore.
+  if (current.active) {
+    return current;
+  }
+
+  const [updatedRow] = await executor
+    .update(patients)
+    .set({ active: true, updatedAt: new Date() })
+    .where(and(eq(patients.id, patientId), eq(patients.clinicId, clinicId)))
+    .returning();
+  const updated = assertRow(updatedRow, "Update de reativação não retornou linha");
+
+  await writeAuditLog(
+    executor,
+    clinicId,
+    actor,
+    "patient.reactivated",
+    updated.id,
+    patientAuditSnapshot(current),
+    patientAuditSnapshot(updated),
+  );
+
+  return updated;
+}
+
 export function createPatientsRepository(db: DbClient, clinicId: string): PatientsRepository {
   return {
     createPatient(input, actor, externalTx) {
@@ -269,6 +305,13 @@ export function createPatientsRepository(db: DbClient, clinicId: string): Patien
         return deactivatePatientCore(externalTx, clinicId, patientId, actor);
       }
       return db.transaction((tx) => deactivatePatientCore(tx, clinicId, patientId, actor));
+    },
+
+    reactivatePatient(patientId, actor, externalTx) {
+      if (externalTx) {
+        return reactivatePatientCore(externalTx, clinicId, patientId, actor);
+      }
+      return db.transaction((tx) => reactivatePatientCore(tx, clinicId, patientId, actor));
     },
   };
 }

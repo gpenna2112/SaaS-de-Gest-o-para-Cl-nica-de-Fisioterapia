@@ -191,4 +191,29 @@ describe("PatientsRepository", () => {
     const entriesAfterSecond = await db.select().from(auditLog).where(eq(auditLog.entityId, patient.id));
     expect(entriesAfterSecond.filter((e) => e.action === "patient.deactivated")).toHaveLength(1);
   });
+
+  it("reactivatePatient marca active=true, grava audit_log, e é idempotente (sem novo registro na 2ª chamada)", async () => {
+    const repo = createPatientsRepository(db, fixture.clinicId);
+    const actor = { type: "professional" as const, professionalId: fixture.professionalId };
+    const patient = await repo.createPatient({ primaryProfessionalId: fixture.professionalId, name: "Y" }, actor);
+    await repo.deactivatePatient(patient.id, actor);
+
+    const reactivated = await repo.reactivatePatient(patient.id, actor);
+    expect(reactivated.active).toBe(true);
+
+    const entriesAfterFirst = await db.select().from(auditLog).where(eq(auditLog.entityId, patient.id));
+    expect(entriesAfterFirst.filter((e) => e.action === "patient.reactivated")).toHaveLength(1);
+
+    const secondCall = await repo.reactivatePatient(patient.id, actor);
+    expect(secondCall.active).toBe(true);
+
+    const entriesAfterSecond = await db.select().from(auditLog).where(eq(auditLog.entityId, patient.id));
+    expect(entriesAfterSecond.filter((e) => e.action === "patient.reactivated")).toHaveLength(1);
+  });
+
+  it("reactivatePatient com id inexistente lança PatientNotFoundError", async () => {
+    const repo = createPatientsRepository(db, fixture.clinicId);
+    const actor = { type: "professional" as const, professionalId: fixture.professionalId };
+    await expect(repo.reactivatePatient(randomUUID(), actor)).rejects.toBeInstanceOf(PatientNotFoundError);
+  });
 });
