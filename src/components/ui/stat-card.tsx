@@ -2,7 +2,7 @@ const toneClasses = {
   primary: "bg-primary/10 text-primary",
   warning: "bg-warning text-warning-foreground",
   danger: "bg-danger/10 text-danger",
-  info: "bg-coral-50 text-coral-700",
+  neutral: "bg-muted text-muted-foreground",
 } as const;
 
 export type StatCardTone = keyof typeof toneClasses;

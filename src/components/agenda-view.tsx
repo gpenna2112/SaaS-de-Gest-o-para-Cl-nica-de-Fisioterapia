@@ -461,7 +461,7 @@ export function AgendaView({
           <StatCard tone="primary" value={sessionsCount} label="Sessões hoje" />
           <StatCard tone="warning" value={pendingCount} label="Pendentes" />
           <StatCard tone="danger" value={cancelledCount} label="Cancelada" />
-          <StatCard tone="info" value={activeRoomsCount} label="Salas ativas" />
+          <StatCard tone="neutral" value={activeRoomsCount} label="Salas ativas" />
         </div>
       </div>
 

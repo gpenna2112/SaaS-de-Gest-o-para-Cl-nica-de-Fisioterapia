@@ -155,14 +155,15 @@ function RoomRow({ room, onChanged }: { room: RoomItem; onChanged: () => void })
         <button type="button" onClick={() => setEditing(true)} className="text-sm text-primary hover:underline">
           Editar
         </button>
-        <button
+        <Button
           type="button"
+          variant={room.active ? "danger" : "secondary"}
           disabled={isToggling}
           onClick={handleToggleActive}
-          className="text-sm text-danger hover:underline disabled:opacity-50"
+          className="min-h-8 px-3 py-1 text-xs"
         >
           {room.active ? "Desativar" : "Reativar"}
-        </button>
+        </Button>
       </div>
     </li>
   );

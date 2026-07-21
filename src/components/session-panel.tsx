@@ -482,14 +482,15 @@ export function SessionPanel({
           ) : null}
         </div>
         {isEdit && canDelete ? (
-          <button
+          <Button
             type="button"
+            variant="danger"
             disabled={pendingKey === "delete"}
             onClick={() => run("delete", () => onDeleteSession(state.session))}
-            className="text-center text-sm font-medium text-danger"
+            className="min-h-11"
           >
             {pendingKey === "delete" ? "Cancelando…" : "Cancelar sessão"}
-          </button>
+          </Button>
         ) : null}
       </div>
     </>

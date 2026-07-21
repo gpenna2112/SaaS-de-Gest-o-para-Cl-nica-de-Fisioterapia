@@ -37,6 +37,7 @@ export function Nav({ userName }: { userName: string }) {
               <Link
                 key={link.href}
                 href={link.href}
+                aria-current={pathname.startsWith(link.href) ? "page" : undefined}
                 className={`rounded-lg px-4 py-1.5 text-sm font-medium ${
                   pathname.startsWith(link.href)
                     ? "bg-background text-foreground shadow-sm"
@@ -66,6 +67,7 @@ export function Nav({ userName }: { userName: string }) {
           <Link
             key={link.href}
             href={link.href}
+            aria-current={pathname.startsWith(link.href) ? "page" : undefined}
             className={`flex-1 py-3 text-center text-sm font-medium ${
               pathname.startsWith(link.href) ? "text-primary" : "text-muted-foreground"
             }`}
