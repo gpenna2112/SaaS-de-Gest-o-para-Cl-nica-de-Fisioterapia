@@ -101,10 +101,12 @@ Priorização feita com a clínica ("todas são dores" → forçada escolha úni
 
 ### Fora do MVP (explicitamente)
 - Pagamentos e cobranças dentro do sistema.
-- Prontuário e evoluções clínicas.
+- Prontuário digital completo (avaliação inicial, tipos de documento plugáveis, estados `rascunho → revisado → finalizado`) — ver nota de reprioritização abaixo para o que *entrou* no MVP.
 - Convênios, guias e TISS.
 - Login de paciente / agendamento self-service.
 - Mensalidades do Pilates.
+
+> **Nota de reprioritização (2026-07-21):** uma versão *mínima* de evolução clínica (registro de texto livre por atendimento realizado + histórico cronológico por paciente) foi trazida para o MVP, contradizendo o texto original desta seção — decisão registrada e justificada no [ADR-0019](adr/0019-evolucao-clinica-minima.md). O prontuário *completo* da fase 3 (§6) continua fora do MVP: sem tipos de documento plugáveis, sem máquina de estados, sem integração com o app de avaliação de pés.
 
 ---
 

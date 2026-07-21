@@ -24,6 +24,7 @@ Registro das decisões arquiteturais do projeto: contexto, alternativas consider
 | [0016](0016-notifications-outbox-session-attendee.md) | Notifications: vínculo por `session_attendee`, idempotência, atomicidade com `scheduling` | Aceito |
 | [0017](0017-auth-escopo-provisionamento-autorizacao.md) | Auth: escopo do Better Auth, provisionamento, autorização por rota, sem FK para `user` | Aceito |
 | [0018](0018-design-system-hibrido-shadcn.md) | Design system: manter componentes próprios; shadcn/ui só sob demanda, de forma híbrida | Aceito |
+| [0019](0019-evolucao-clinica-minima.md) | Evolução clínica mínima (histórico/registro por atendimento), antecipada da fase 3 | Aceito |
 
 ## Formato
 
