@@ -6,9 +6,15 @@ import { getSessionUser } from "@/modules/auth/session";
 export default async function AppLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const sessionUser = await getSessionUser(await headers());
+  const requestHeaders = await headers();
+  const sessionUser = await getSessionUser(requestHeaders);
   if (!sessionUser) {
-    redirect("/login");
+    const currentPath = requestHeaders.get("x-pathname");
+    const loginUrl =
+      currentPath && currentPath !== "/"
+        ? `/login?from=${encodeURIComponent(currentPath)}`
+        : "/login";
+    redirect(loginUrl);
   }
 
   return <AppShell user={sessionUser}>{children}</AppShell>;

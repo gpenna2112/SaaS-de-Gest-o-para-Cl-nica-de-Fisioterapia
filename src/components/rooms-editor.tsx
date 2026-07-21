@@ -171,7 +171,7 @@ function RoomRow({ room, onChanged }: { room: RoomItem; onChanged: () => void })
           {!room.active ? <StatusBadge tone="neutral">Inativa</StatusBadge> : null}
         </div>
         <div className="flex items-center gap-2">
-          <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {room.capacity} {room.capacity > 1 ? "vagas" : "vaga"}
           </span>
           <button type="button" onClick={() => setEditing(true)} className="text-sm text-primary hover:underline">

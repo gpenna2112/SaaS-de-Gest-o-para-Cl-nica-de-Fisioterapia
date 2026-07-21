@@ -32,8 +32,14 @@ export default async function EquipePage() {
 
   return (
     <div className="flex max-w-xl flex-col gap-6">
+      <h1 className="sr-only">Equipe &amp; Salas</h1>
+      {!isGestora ? (
+        <p className="text-sm text-muted-foreground">
+          Só gestoras podem cadastrar ou editar fisioterapeutas e salas. Você está vendo a lista em modo leitura.
+        </p>
+      ) : null}
       <div>
-        <h1 className="mb-3 text-lg font-semibold">Fisioterapeutas</h1>
+        <h2 className="mb-3 text-lg font-semibold">Fisioterapeutas</h2>
         {isGestora ? (
           <TeamEditor
             professionals={professionals.map((professional) => ({
@@ -64,7 +70,7 @@ export default async function EquipePage() {
       </div>
 
       <div>
-        <h1 className="mb-3 text-lg font-semibold">Salas</h1>
+        <h2 className="mb-3 text-lg font-semibold">Salas</h2>
         {isGestora ? (
           <RoomsEditor
             rooms={rooms.map((room) => ({
@@ -84,7 +90,7 @@ export default async function EquipePage() {
                     <span className="font-medium">{room.name}</span>
                     {!room.active ? <StatusBadge tone="neutral">Inativa</StatusBadge> : null}
                   </div>
-                  <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     {room.capacity} {room.capacity > 1 ? "vagas" : "vaga"}
                   </span>
                 </li>

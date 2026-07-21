@@ -53,5 +53,5 @@ export default async function DashboardPage() {
     cancelledCount: cancelledAttendeesCount,
   });
 
-  return <DashboardView snapshot={snapshot} dateLabel={formatDateLongPtBr(date)} />;
+  return <DashboardView snapshot={snapshot} dateLabel={formatDateLongPtBr(date)} date={date} />;
 }

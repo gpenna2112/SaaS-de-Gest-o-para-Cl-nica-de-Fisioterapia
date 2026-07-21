@@ -6,8 +6,16 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { PatientMultiselect, type PatientOption } from "@/components/patient-multiselect";
-import { get, getApiErrorMessage, patch as apiPatch, post as apiPost } from "@/lib/api-client";
+import {
+  PatientMultiselect,
+  type PatientOption,
+} from "@/components/patient-multiselect";
+import {
+  get,
+  getApiErrorMessage,
+  patch as apiPatch,
+  post as apiPost,
+} from "@/lib/api-client";
 import {
   addMinutesToTime,
   combineDateAndTimeInSaoPaulo,
@@ -20,7 +28,10 @@ import {
   isValidStatusTransition,
   type AttendeeStatus,
 } from "@/modules/scheduling/session-state-machine";
-import type { SessionAttendeeView, SessionView } from "@/modules/scheduling/session-view";
+import type {
+  SessionAttendeeView,
+  SessionView,
+} from "@/modules/scheduling/session-view";
 
 export interface ProfessionalOption {
   id: string;
@@ -32,7 +43,11 @@ export interface RoomOption {
   name: string;
 }
 
-const QUICK_ACTIONS: { target: Exclude<AttendeeStatus, "agendada">; label: string; title: string }[] = [
+const QUICK_ACTIONS: {
+  target: Exclude<AttendeeStatus, "agendada">;
+  label: string;
+  title: string;
+}[] = [
   { target: "realizada", label: "✓", title: "Marcar como realizada" },
   { target: "falta", label: "⊘", title: "Marcar falta" },
   { target: "cancelada", label: "✕", title: "Cancelar" },
@@ -71,7 +86,8 @@ function EvolutionEditor({
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const isAuthor = !evolution || evolution.professionalId === currentProfessionalId;
+  const isAuthor =
+    !evolution || evolution.professionalId === currentProfessionalId;
 
   // Busca sob demanda no clique (não em efeito) — só precisamos saber se já
   // existe uma evolução na primeira vez que o profissional abre a seção.
@@ -90,7 +106,9 @@ function EvolutionEditor({
       }
       setLoaded(true);
     } catch (err) {
-      setError(getApiErrorMessage(err, "Não foi possível carregar a evolução."));
+      setError(
+        getApiErrorMessage(err, "Não foi possível carregar a evolução."),
+      );
     } finally {
       setLoading(false);
     }
@@ -102,12 +120,18 @@ function EvolutionEditor({
     setIsSaving(true);
     try {
       if (evolution) {
-        const result = await apiPatch<{ evolution: EvolutionData }>(`/api/v1/evolutions/${evolution.id}`, { content });
+        const result = await apiPatch<{ evolution: EvolutionData }>(
+          `/api/v1/evolutions/${evolution.id}`,
+          { content },
+        );
         setEvolution(result.evolution);
       } else {
-        const result = await apiPost<{ evolution: EvolutionData }>(`/api/v1/session-attendees/${attendeeId}/evolution`, {
-          content,
-        });
+        const result = await apiPost<{ evolution: EvolutionData }>(
+          `/api/v1/session-attendees/${attendeeId}/evolution`,
+          {
+            content,
+          },
+        );
         setEvolution(result.evolution);
       }
       setSaved(true);
@@ -123,9 +147,16 @@ function EvolutionEditor({
       <button
         type="button"
         onClick={handleToggleOpen}
+        aria-expanded={open}
         className="text-left text-xs font-semibold text-primary hover:underline"
       >
-        {open ? "Ocultar evolução" : evolution ? (isAuthor ? "Ver/editar evolução" : "Ver evolução") : "+ Registrar evolução"}
+        {open
+          ? "Ocultar evolução"
+          : evolution
+            ? isAuthor
+              ? "Ver/editar evolução"
+              : "Ver evolução"
+            : "+ Registrar evolução"}
       </button>
       {open ? (
         loading ? (
@@ -159,7 +190,9 @@ function EvolutionEditor({
             <p className="whitespace-pre-wrap rounded-md border border-input-border bg-background px-2 py-1.5 text-xs text-foreground">
               {content}
             </p>
-            <p className="text-xs text-muted-foreground">Só quem registrou esta evolução pode editá-la.</p>
+            <p className="text-xs text-muted-foreground">
+              Só quem registrou esta evolução pode editá-la.
+            </p>
           </div>
         )
       ) : null}
@@ -219,8 +252,14 @@ export function SessionPanel({
   defaultProfessionalId?: string;
   currentProfessionalId?: string;
   onClose: () => void;
-  onCreate: (input: { professionalId: string; patientIds: string[] }) => Promise<void>;
-  onSetAttendeeStatus: (attendeeId: string, status: AttendeeStatus) => Promise<void>;
+  onCreate: (input: {
+    professionalId: string;
+    patientIds: string[];
+  }) => Promise<void>;
+  onSetAttendeeStatus: (
+    attendeeId: string,
+    status: AttendeeStatus,
+  ) => Promise<void>;
   onAddPatient: (patientId: string) => Promise<void>;
   onDeleteSession: (session: SessionView) => Promise<void>;
   onReschedule: (
@@ -229,7 +268,8 @@ export function SessionPanel({
   ) => Promise<void>;
 }) {
   const [professionalId, setProfessionalId] = useState(
-    defaultProfessionalId && professionals.some((p) => p.id === defaultProfessionalId)
+    defaultProfessionalId &&
+      professionals.some((p) => p.id === defaultProfessionalId)
       ? defaultProfessionalId
       : (professionals[0]?.id ?? ""),
   );
@@ -244,7 +284,9 @@ export function SessionPanel({
   const isPilates = state.roomType === "pilates";
 
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
-  const [rescheduleRoomId, setRescheduleRoomId] = useState(() => (isEdit ? state.roomId : ""));
+  const [rescheduleRoomId, setRescheduleRoomId] = useState(() =>
+    isEdit ? state.roomId : "",
+  );
   const [rescheduleDate, setRescheduleDate] = useState(() =>
     isEdit ? formatDateSaoPaulo(state.session.scheduledStart) : "",
   );
@@ -253,10 +295,13 @@ export function SessionPanel({
   );
 
   const activeAttendees: SessionAttendeeView[] = isEdit
-    ? state.session.attendees.filter((attendee) => attendee.status !== "cancelada")
+    ? state.session.attendees.filter(
+        (attendee) => attendee.status !== "cancelada",
+      )
     : [];
   const availableToAdd = patients.filter(
-    (patient) => !activeAttendees.some((attendee) => attendee.patientId === patient.id),
+    (patient) =>
+      !activeAttendees.some((attendee) => attendee.patientId === patient.id),
   );
   // "Cancelar sessão" só cancela quem ainda permite a transição — se todo
   // mundo já está realizada/falta (registro histórico, ADR-0010), não há
@@ -294,7 +339,11 @@ export function SessionPanel({
   }
 
   function handleCreate() {
-    const ids = isPilates ? patientIds : singlePatientId ? [singlePatientId] : [];
+    const ids = isPilates
+      ? patientIds
+      : singlePatientId
+        ? [singlePatientId]
+        : [];
     if (!professionalId || ids.length === 0) {
       setError("Selecione o profissional e ao menos um paciente.");
       return;
@@ -308,208 +357,295 @@ export function SessionPanel({
       setError("Selecione sala, data e horário para remarcar.");
       return;
     }
-    const scheduledStart = combineDateAndTimeInSaoPaulo(rescheduleDate, rescheduleTime);
-    const scheduledEnd = combineDateAndTimeInSaoPaulo(rescheduleDate, addMinutesToTime(rescheduleTime, slotMinutes));
-    run("reschedule", () => onReschedule(state.session, { roomId: rescheduleRoomId, scheduledStart, scheduledEnd }));
+    const scheduledStart = combineDateAndTimeInSaoPaulo(
+      rescheduleDate,
+      rescheduleTime,
+    );
+    const scheduledEnd = combineDateAndTimeInSaoPaulo(
+      rescheduleDate,
+      addMinutesToTime(rescheduleTime, slotMinutes),
+    );
+    run("reschedule", () =>
+      onReschedule(state.session, {
+        roomId: rescheduleRoomId,
+        scheduledStart,
+        scheduledEnd,
+      }),
+    );
   }
 
   return (
     <>
       <div className="fixed inset-0 z-40 bg-foreground/30" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col gap-4 overflow-y-auto bg-background p-6 shadow-xl">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="text-xs font-semibold text-muted-foreground">{state.roomName}</div>
-            <div className="text-base font-semibold">{state.dayHourLabel}</div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Fechar"
-            className="-mr-2 -mt-2 flex h-11 w-11 items-center justify-center rounded-md text-xl leading-none text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-semibold text-muted-foreground">Fisioterapeuta</span>
-          {isEdit ? (
-            <div className="rounded-md border border-input-border bg-muted px-3 py-2 text-sm text-muted-foreground">
-              {state.professionalName}
-              <span className="ml-1 text-xs">(fixo após criada)</span>
+      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col bg-background shadow-xl">
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-xs font-semibold text-muted-foreground">
+                {state.roomName}
+              </div>
+              <div className="text-base font-semibold">
+                {state.dayHourLabel}
+              </div>
             </div>
-          ) : (
-            <Select value={professionalId} onChange={(event) => setProfessionalId(event.target.value)}>
-              <option value="" disabled>
-                Selecionar…
-              </option>
-              {professionals.map((professional) => (
-                <option key={professional.id} value={professional.id}>
-                  {professional.name}
-                </option>
-              ))}
-            </Select>
-          )}
-        </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Fechar"
+              className="-mr-2 -mt-2 flex h-11 w-11 items-center justify-center rounded-md text-xl leading-none text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              ×
+            </button>
+          </div>
 
-        <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-semibold text-muted-foreground">
-            Paciente(s) · {isEdit ? activeAttendees.length : (isPilates ? patientIds.length : singlePatientId ? 1 : 0)}/{state.roomCapacity}
-          </span>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold text-muted-foreground">
+              Fisioterapeuta
+            </span>
+            {isEdit ? (
+              <div className="rounded-md border border-input-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+                {state.professionalName}
+                <span className="ml-1 text-xs">(fixo após criada)</span>
+              </div>
+            ) : (
+              <Select
+                value={professionalId}
+                onChange={(event) => setProfessionalId(event.target.value)}
+              >
+                <option value="" disabled>
+                  Selecionar…
+                </option>
+                {professionals.map((professional) => (
+                  <option key={professional.id} value={professional.id}>
+                    {professional.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold text-muted-foreground">
+              Paciente(s) ·{" "}
+              {isEdit
+                ? activeAttendees.length
+                : isPilates
+                  ? patientIds.length
+                  : singlePatientId
+                    ? 1
+                    : 0}
+              /{state.roomCapacity}
+            </span>
+
+            {isEdit ? (
+              <div className="flex flex-col gap-2">
+                <ul className="flex flex-col gap-2 rounded-md border border-input-border p-2">
+                  {activeAttendees.map((attendee) => {
+                    const targets = QUICK_ACTIONS.filter((qa) =>
+                      isValidStatusTransition(
+                        attendee.status as AttendeeStatus,
+                        qa.target,
+                      ),
+                    );
+                    return (
+                      <li
+                        key={attendee.id}
+                        className="flex flex-col gap-1.5 text-sm"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate">
+                            {attendee.patientName ?? "Paciente"}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <StatusBadge
+                              tone={
+                                STATUS_TONES[
+                                  attendee.status as AttendeeStatus
+                                ] ?? "neutral"
+                              }
+                            >
+                              {STATUS_LABELS[
+                                attendee.status as AttendeeStatus
+                              ] ?? attendee.status}
+                            </StatusBadge>
+                            {targets.map((qa) => (
+                              <button
+                                key={qa.target}
+                                type="button"
+                                title={qa.title}
+                                disabled={pendingKey === attendee.id}
+                                className={quickActionButtonClass(false)}
+                                onClick={() =>
+                                  run(attendee.id, () =>
+                                    onSetAttendeeStatus(attendee.id, qa.target),
+                                  )
+                                }
+                              >
+                                {qa.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        {attendee.status === "realizada" ? (
+                          <EvolutionEditor
+                            attendeeId={attendee.id}
+                            currentProfessionalId={currentProfessionalId}
+                          />
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+                {activeAttendees.length < state.roomCapacity &&
+                availableToAdd.length > 0 ? (
+                  <div className="flex gap-2">
+                    <Select
+                      value={addPatientId}
+                      onChange={(event) => setAddPatientId(event.target.value)}
+                    >
+                      <option value="">+ adicionar paciente…</option>
+                      {availableToAdd.map((patient) => (
+                        <option key={patient.id} value={patient.id}>
+                          {patient.name}
+                        </option>
+                      ))}
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="min-h-11"
+                      disabled={!addPatientId || pendingKey === "add"}
+                      onClick={() =>
+                        run("add", async () => {
+                          await onAddPatient(addPatientId);
+                          setAddPatientId("");
+                        })
+                      }
+                    >
+                      Add
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            ) : isPilates ? (
+              <PatientMultiselect
+                patients={patients}
+                selected={patientIds}
+                onChange={setPatientIds}
+                capacity={state.roomCapacity}
+              />
+            ) : (
+              <Select
+                value={singlePatientId}
+                onChange={(event) => setSinglePatientId(event.target.value)}
+              >
+                <option value="">Selecionar…</option>
+                {patients.map((patient) => (
+                  <option key={patient.id} value={patient.id}>
+                    {patient.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </div>
 
           {isEdit ? (
-            <div className="flex flex-col gap-2">
-              <ul className="flex flex-col gap-2 rounded-md border border-input-border p-2">
-                {activeAttendees.map((attendee) => {
-                  const targets = QUICK_ACTIONS.filter((qa) =>
-                    isValidStatusTransition(attendee.status as AttendeeStatus, qa.target),
-                  );
-                  return (
-                    <li key={attendee.id} className="flex flex-col gap-1.5 text-sm">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate">{attendee.patientName ?? "Paciente"}</span>
-                        <div className="flex items-center gap-1.5">
-                          <StatusBadge tone={STATUS_TONES[attendee.status as AttendeeStatus] ?? "neutral"}>
-                            {STATUS_LABELS[attendee.status as AttendeeStatus] ?? attendee.status}
-                          </StatusBadge>
-                          {targets.map((qa) => (
-                            <button
-                              key={qa.target}
-                              type="button"
-                              title={qa.title}
-                              disabled={pendingKey === attendee.id}
-                              className={quickActionButtonClass(false)}
-                              onClick={() => run(attendee.id, () => onSetAttendeeStatus(attendee.id, qa.target))}
-                            >
-                              {qa.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      {attendee.status === "realizada" ? (
-                        <EvolutionEditor attendeeId={attendee.id} currentProfessionalId={currentProfessionalId} />
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-              {activeAttendees.length < state.roomCapacity && availableToAdd.length > 0 ? (
-                <div className="flex gap-2">
-                  <Select value={addPatientId} onChange={(event) => setAddPatientId(event.target.value)}>
-                    <option value="">+ adicionar paciente…</option>
-                    {availableToAdd.map((patient) => (
-                      <option key={patient.id} value={patient.id}>
-                        {patient.name}
+            <div className="flex flex-col gap-2 rounded-md border border-input-border p-3">
+              <button
+                type="button"
+                onClick={() => setRescheduleOpen((current) => !current)}
+                aria-expanded={rescheduleOpen}
+                className="flex items-center justify-between text-left text-sm font-semibold text-foreground"
+              >
+                Remarcar sessão
+                <span className="text-xs font-normal text-muted-foreground">
+                  {rescheduleOpen ? "▲" : "▼"}
+                </span>
+              </button>
+              {rescheduleOpen ? (
+                <div className="flex flex-col gap-2">
+                  <Select
+                    value={rescheduleRoomId}
+                    onChange={(event) =>
+                      setRescheduleRoomId(event.target.value)
+                    }
+                  >
+                    {rooms.map((room) => (
+                      <option key={room.id} value={room.id}>
+                        {room.name}
                       </option>
                     ))}
                   </Select>
+                  <div className="flex gap-2">
+                    <Input
+                      type="date"
+                      value={rescheduleDate}
+                      onChange={(event) =>
+                        setRescheduleDate(event.target.value)
+                      }
+                      className="flex-1"
+                    />
+                    <Input
+                      type="time"
+                      value={rescheduleTime}
+                      onChange={(event) =>
+                        setRescheduleTime(event.target.value)
+                      }
+                      className="flex-1"
+                    />
+                  </div>
                   <Button
                     type="button"
                     variant="secondary"
                     className="min-h-11"
-                    disabled={!addPatientId || pendingKey === "add"}
-                    onClick={() =>
-                      run("add", async () => {
-                        await onAddPatient(addPatientId);
-                        setAddPatientId("");
-                      })
-                    }
+                    disabled={pendingKey === "reschedule"}
+                    onClick={handleReschedule}
                   >
-                    Add
+                    {pendingKey === "reschedule"
+                      ? "Remarcando…"
+                      : "Confirmar remarcação"}
                   </Button>
                 </div>
               ) : null}
             </div>
-          ) : isPilates ? (
-            <PatientMultiselect
-              patients={patients}
-              selected={patientIds}
-              onChange={setPatientIds}
-              capacity={state.roomCapacity}
-            />
-          ) : (
-            <Select value={singlePatientId} onChange={(event) => setSinglePatientId(event.target.value)}>
-              <option value="">Selecionar…</option>
-              {patients.map((patient) => (
-                <option key={patient.id} value={patient.id}>
-                  {patient.name}
-                </option>
-              ))}
-            </Select>
-          )}
+          ) : null}
+
+          {error ? <p className="text-sm text-danger">{error}</p> : null}
         </div>
 
-        {isEdit ? (
-          <div className="flex flex-col gap-2 rounded-md border border-input-border p-3">
-            <button
+        <div className="flex flex-col gap-2 border-t border-border p-6">
+          <div className="flex gap-2">
+            <Button
               type="button"
-              onClick={() => setRescheduleOpen((current) => !current)}
-              className="flex items-center justify-between text-left text-sm font-semibold text-foreground"
+              variant="secondary"
+              className="min-h-11"
+              onClick={onClose}
             >
-              Remarcar sessão
-              <span className="text-xs font-normal text-muted-foreground">{rescheduleOpen ? "▲" : "▼"}</span>
-            </button>
-            {rescheduleOpen ? (
-              <div className="flex flex-col gap-2">
-                <Select value={rescheduleRoomId} onChange={(event) => setRescheduleRoomId(event.target.value)}>
-                  {rooms.map((room) => (
-                    <option key={room.id} value={room.id}>
-                      {room.name}
-                    </option>
-                  ))}
-                </Select>
-                <div className="flex gap-2">
-                  <Input
-                    type="date"
-                    value={rescheduleDate}
-                    onChange={(event) => setRescheduleDate(event.target.value)}
-                    className="flex-1"
-                  />
-                  <Input
-                    type="time"
-                    value={rescheduleTime}
-                    onChange={(event) => setRescheduleTime(event.target.value)}
-                    className="flex-1"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="min-h-11"
-                  disabled={pendingKey === "reschedule"}
-                  onClick={handleReschedule}
-                >
-                  {pendingKey === "reschedule" ? "Remarcando…" : "Confirmar remarcação"}
-                </Button>
-              </div>
+              {isEdit ? "Fechar" : "Cancelar"}
+            </Button>
+            {!isEdit ? (
+              <Button
+                type="button"
+                className="min-h-11"
+                disabled={pendingKey === "create"}
+                onClick={handleCreate}
+              >
+                {pendingKey === "create" ? "Criando…" : "Criar sessão"}
+              </Button>
             ) : null}
           </div>
-        ) : null}
-
-        {error ? <p className="text-sm text-danger">{error}</p> : null}
-
-        <div className="mt-2 flex gap-2">
-          <Button type="button" variant="secondary" className="min-h-11" onClick={onClose}>
-            {isEdit ? "Fechar" : "Cancelar"}
-          </Button>
-          {!isEdit ? (
-            <Button type="button" className="min-h-11" disabled={pendingKey === "create"} onClick={handleCreate}>
-              {pendingKey === "create" ? "Criando…" : "Criar sessão"}
+          {isEdit && canDelete ? (
+            <Button
+              type="button"
+              variant="danger"
+              disabled={pendingKey === "delete"}
+              onClick={() => setConfirmCancelOpen(true)}
+              className="min-h-11"
+            >
+              {pendingKey === "delete" ? "Cancelando…" : "Cancelar sessão"}
             </Button>
           ) : null}
         </div>
-        {isEdit && canDelete ? (
-          <Button
-            type="button"
-            variant="danger"
-            disabled={pendingKey === "delete"}
-            onClick={() => setConfirmCancelOpen(true)}
-            className="min-h-11"
-          >
-            {pendingKey === "delete" ? "Cancelando…" : "Cancelar sessão"}
-          </Button>
-        ) : null}
       </div>
       <ConfirmDialog
         open={confirmCancelOpen}

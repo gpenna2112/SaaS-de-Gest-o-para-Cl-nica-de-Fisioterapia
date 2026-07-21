@@ -170,15 +170,6 @@ export function AgendaView({
     });
   }
 
-  function openQuickCreate() {
-    const room = visibleRooms[0] ?? rooms[0];
-    if (!room) return;
-    const occupied = occupiedByRoom.get(room.id);
-    const freeSlotIndex = slots.findIndex((_, index) => !occupied?.has(index));
-    const hour = freeSlotIndex === -1 ? DAY_START_MINUTES : (slots[freeSlotIndex] ?? DAY_START_MINUTES);
-    setPanel({ mode: "create", roomId: room.id, hour });
-  }
-
   async function withRefresh(action: () => Promise<unknown>) {
     await action();
     router.refresh();
@@ -603,15 +594,6 @@ export function AgendaView({
           </div>
         </>
       )}
-
-      <button
-        type="button"
-        onClick={openQuickCreate}
-        aria-label="Nova sessão"
-        className="fixed bottom-20 left-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-2xl font-light leading-none text-primary-foreground shadow-lg hover:opacity-90 md:bottom-6 md:left-6"
-      >
-        +
-      </button>
 
       {panel ? (
         (() => {
