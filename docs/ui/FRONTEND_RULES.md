@@ -55,7 +55,7 @@ Preferir componentes pequenos e reutilizáveis, nomes claros, estado simples, pr
 
 ## Ao redesenhar uma tela
 
-Não bastar melhorar cores. Revisar: hierarquia de informação, espaçamento, alinhamento, fluxo de interação, legibilidade, acessibilidade, responsividade. Questionar o layout atual se existir uma UX melhor. Explicar o porquê de cada decisão de design.
+Não basta melhorar cores. Revisar: hierarquia de informação, espaçamento, alinhamento, fluxo de interação, legibilidade, acessibilidade, responsividade. Questionar o layout atual se existir uma UX melhor. Explicar o porquê de cada decisão de design.
 
 ## Checklist antes de considerar uma tarefa de frontend concluída
 
