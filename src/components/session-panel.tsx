@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -237,6 +238,7 @@ export function SessionPanel({
   const [addPatientId, setAddPatientId] = useState("");
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
 
   const isEdit = state.mode === "edit";
   const isPilates = state.roomType === "pilates";
@@ -270,6 +272,22 @@ export function SessionPanel({
       await action();
     } catch (err) {
       setError(getApiErrorMessage(err, "Não foi possível concluir a ação."));
+    } finally {
+      setPendingKey(null);
+    }
+  }
+
+  // Handler dedicado (não usa `run`, que engole o erro): o ConfirmDialog
+  // precisa que a promise rejeite para saber que deve permanecer aberto.
+  async function handleConfirmDelete() {
+    if (!isEdit) return;
+    setError(null);
+    setPendingKey("delete");
+    try {
+      await onDeleteSession(state.session);
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Não foi possível cancelar a sessão."));
+      throw err;
     } finally {
       setPendingKey(null);
     }
@@ -486,13 +504,22 @@ export function SessionPanel({
             type="button"
             variant="danger"
             disabled={pendingKey === "delete"}
-            onClick={() => run("delete", () => onDeleteSession(state.session))}
+            onClick={() => setConfirmCancelOpen(true)}
             className="min-h-11"
           >
             {pendingKey === "delete" ? "Cancelando…" : "Cancelar sessão"}
           </Button>
         ) : null}
       </div>
+      <ConfirmDialog
+        open={confirmCancelOpen}
+        onOpenChange={setConfirmCancelOpen}
+        title="Cancelar esta sessão?"
+        description="Participantes já marcados como realizada ou falta não são afetados — só quem ainda está agendado ou confirmado é cancelado."
+        confirmLabel="Cancelar sessão"
+        isConfirming={pendingKey === "delete"}
+        onConfirm={handleConfirmDelete}
+      />
     </>
   );
 }

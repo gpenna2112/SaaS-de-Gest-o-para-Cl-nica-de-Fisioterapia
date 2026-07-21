@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -32,7 +33,8 @@ export function PatientEditForm({
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSavingFields, startSavingFields] = useTransition();
-  const [isTogglingActive, startTogglingActive] = useTransition();
+  const [isTogglingActive, setIsTogglingActive] = useState(false);
+  const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -67,18 +69,35 @@ export function PatientEditForm({
     });
   }
 
-  function handleToggleActive() {
+  async function handleReactivate() {
     setFormError(null);
-    startTogglingActive(async () => {
-      try {
-        const nextActive = !active;
-        await patch(`/api/v1/patients/${patient.id}`, { active: nextActive });
-        setActive(nextActive);
-        router.refresh();
-      } catch (error) {
-        setFormError(getApiErrorMessage(error, "Não foi possível concluir a ação. Tente novamente."));
-      }
-    });
+    setIsTogglingActive(true);
+    try {
+      await patch(`/api/v1/patients/${patient.id}`, { active: true });
+      setActive(true);
+      router.refresh();
+    } catch (error) {
+      setFormError(getApiErrorMessage(error, "Não foi possível concluir a ação. Tente novamente."));
+    } finally {
+      setIsTogglingActive(false);
+    }
+  }
+
+  // Não usa `run`/`startTransition`: o ConfirmDialog precisa que a promise
+  // rejeite para saber que deve permanecer aberto.
+  async function handleConfirmDeactivate() {
+    setFormError(null);
+    setIsTogglingActive(true);
+    try {
+      await patch(`/api/v1/patients/${patient.id}`, { active: false });
+      setActive(false);
+      router.refresh();
+    } catch (error) {
+      setFormError(getApiErrorMessage(error, "Não foi possível desativar o paciente. Tente novamente."));
+      throw error;
+    } finally {
+      setIsTogglingActive(false);
+    }
   }
 
   return (
@@ -132,7 +151,7 @@ export function PatientEditForm({
           type="button"
           variant={active ? "danger" : "secondary"}
           disabled={isTogglingActive}
-          onClick={handleToggleActive}
+          onClick={() => (active ? setConfirmDeactivateOpen(true) : handleReactivate())}
         >
           {isTogglingActive ? "Aguarde..." : active ? "Desativar paciente" : "Reativar paciente"}
         </Button>
@@ -142,6 +161,15 @@ export function PatientEditForm({
           </p>
         ) : null}
       </div>
+      <ConfirmDialog
+        open={confirmDeactivateOpen}
+        onOpenChange={setConfirmDeactivateOpen}
+        title={`Desativar ${patient.name}?`}
+        description="Bloqueia novos agendamentos. Sessões já existentes não são canceladas."
+        confirmLabel="Desativar"
+        isConfirming={isTogglingActive}
+        onConfirm={handleConfirmDeactivate}
+      />
     </div>
   );
 }

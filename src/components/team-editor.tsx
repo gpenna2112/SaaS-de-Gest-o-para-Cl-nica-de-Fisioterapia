@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -88,7 +89,8 @@ function ProfessionalRow({ professional, onChanged }: { professional: Profession
   const [role, setRole] = useState(professional.role);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
-  const [isToggling, startToggling] = useTransition();
+  const [isToggling, setIsToggling] = useState(false);
+  const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
 
   function handleSave() {
     setError(null);
@@ -103,16 +105,34 @@ function ProfessionalRow({ professional, onChanged }: { professional: Profession
     });
   }
 
-  function handleToggleActive() {
-    startToggling(async () => {
-      try {
-        await patch(`/api/v1/professionals/${professional.id}`, { active: !professional.active });
-        onChanged();
-      } catch {
-        // erro silencioso aqui é aceitável: a lista simplesmente não muda e o
-        // botão volta ao estado normal, sem bloquear a tela.
-      }
-    });
+  async function handleReactivate() {
+    setError(null);
+    setIsToggling(true);
+    try {
+      await patch(`/api/v1/professionals/${professional.id}`, { active: true });
+      onChanged();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Não foi possível reativar. Tente novamente."));
+    } finally {
+      setIsToggling(false);
+    }
+  }
+
+  // Não usa `startTransition`: o ConfirmDialog precisa que a promise
+  // rejeite para saber que deve permanecer aberto. Antes o erro de
+  // desativação era engolido silenciosamente — agora aparece em `error`.
+  async function handleConfirmDeactivate() {
+    setError(null);
+    setIsToggling(true);
+    try {
+      await patch(`/api/v1/professionals/${professional.id}`, { active: false });
+      onChanged();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Não foi possível desativar. Tente novamente."));
+      throw err;
+    } finally {
+      setIsToggling(false);
+    }
   }
 
   if (editing) {
@@ -138,26 +158,38 @@ function ProfessionalRow({ professional, onChanged }: { professional: Profession
   }
 
   return (
-    <li className="flex items-center justify-between gap-4 px-4 py-3">
-      <div className="flex items-center gap-2">
-        <span className="font-medium">{professional.name}</span>
-        {!professional.active ? <StatusBadge tone="neutral">Inativo</StatusBadge> : null}
+    <li className="flex flex-col gap-1 px-4 py-3">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{professional.name}</span>
+          {!professional.active ? <StatusBadge tone="neutral">Inativo</StatusBadge> : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">{ROLE_LABELS[professional.role] ?? professional.role}</span>
+          <button type="button" onClick={() => setEditing(true)} className="text-sm text-primary hover:underline">
+            Editar
+          </button>
+          <Button
+            type="button"
+            variant={professional.active ? "danger" : "secondary"}
+            disabled={isToggling}
+            onClick={() => (professional.active ? setConfirmDeactivateOpen(true) : handleReactivate())}
+            className="min-h-8 px-3 py-1 text-xs"
+          >
+            {professional.active ? "Desativar" : "Reativar"}
+          </Button>
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">{ROLE_LABELS[professional.role] ?? professional.role}</span>
-        <button type="button" onClick={() => setEditing(true)} className="text-sm text-primary hover:underline">
-          Editar
-        </button>
-        <Button
-          type="button"
-          variant={professional.active ? "danger" : "secondary"}
-          disabled={isToggling}
-          onClick={handleToggleActive}
-          className="min-h-8 px-3 py-1 text-xs"
-        >
-          {professional.active ? "Desativar" : "Reativar"}
-        </Button>
-      </div>
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      <ConfirmDialog
+        open={confirmDeactivateOpen}
+        onOpenChange={setConfirmDeactivateOpen}
+        title={`Desativar ${professional.name}?`}
+        description="Impede novos agendamentos com este profissional. Sessões já existentes não são afetadas."
+        confirmLabel="Desativar"
+        isConfirming={isToggling}
+        onConfirm={handleConfirmDeactivate}
+      />
     </li>
   );
 }
