@@ -35,20 +35,25 @@ export default async function AgendaPage({
 
   const { start, end } = dayRangeInSaoPaulo(date);
 
-  const [rooms, sessionsWithAttendees, allPatients, activePatients, professionals, clinic] = await Promise.all([
-    roomsRepository.listRooms({ activeOnly: true }),
-    schedulingRepository.listSessions({ rangeStart: start, rangeEnd: end }),
-    // Nome de attendee precisa resolver mesmo para paciente desativado depois
-    // (desativar não cancela sessões existentes, ver CLAUDE.md/patients/README).
-    patientsRepository.listPatients({}),
-    // Selecionável (criar sessão / adicionar paciente) é só quem está ativo.
-    patientsRepository.listPatients({ activeOnly: true }),
-    professionalsRepository.listProfessionals({ activeOnly: true }),
-    clinicsRepository.getClinic(),
-  ]);
+  const [rooms, sessionsWithAttendees, cancelledAttendeesCount, allPatients, activePatients, professionals, clinic] =
+    await Promise.all([
+      roomsRepository.listRooms({ activeOnly: true }),
+      schedulingRepository.listSessions({ rangeStart: start, rangeEnd: end }),
+      // Contagem separada: `listSessions` só traz `sessions.status = 'ativa'`
+      // (ADR-0015), então uma turma cancelada por completo não aparece ali.
+      schedulingRepository.countCancelledAttendees({ rangeStart: start, rangeEnd: end }),
+      // Nome de attendee precisa resolver mesmo para paciente desativado depois
+      // (desativar não cancela sessões existentes, ver CLAUDE.md/patients/README).
+      patientsRepository.listPatients({}),
+      // Selecionável (criar sessão / adicionar paciente) é só quem está ativo.
+      patientsRepository.listPatients({ activeOnly: true }),
+      professionalsRepository.listProfessionals({ activeOnly: true }),
+      clinicsRepository.getClinic(),
+    ]);
 
   const patientNameById = new Map(allPatients.map((patient) => [patient.id, patient.name]));
   const sessions = toSessionViews(sessionsWithAttendees, patientNameById);
+  const patientPhoneById = Object.fromEntries(allPatients.map((patient) => [patient.id, patient.phone]));
 
   return (
     <AgendaView
@@ -58,6 +63,8 @@ export default async function AgendaPage({
       slotMinutes={clinic?.defaultSessionDurationMinutes ?? 50}
       professionals={professionals.map((professional) => ({ id: professional.id, name: professional.name }))}
       patients={activePatients.map((patient) => ({ id: patient.id, name: patient.name }))}
+      patientPhoneById={patientPhoneById}
+      cancelledCount={cancelledAttendeesCount}
       currentProfessionalId={sessionUser.professionalId}
     />
   );

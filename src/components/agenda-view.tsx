@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SessionPanel, type PanelState, type ProfessionalOption } from "@/components/session-panel";
 import { patch, post } from "@/lib/api-client";
@@ -63,6 +64,45 @@ function formatSlotLabel(minutes: number): string {
   const minute = minutes % 60;
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
+}
+
+function WhatsAppIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
+      <path d="M12.04 2c-5.46 0-9.9 4.44-9.9 9.9 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.9-4.44 9.9-9.9 0-2.64-1.03-5.12-2.9-6.99A9.82 9.82 0 0 0 12.04 2Zm5.8 14.13c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.12.11-1.8-.11-.42-.13-.96-.31-1.66-.6-2.92-1.26-4.83-4.2-4.98-4.4-.15-.2-1.2-1.6-1.2-3.05s.76-2.16 1.03-2.46c.27-.3.58-.37.78-.37.2 0 .39 0 .56.01.18.01.42-.07.65.5.24.58.82 2 .89 2.14.07.15.12.32.02.52-.1.2-.15.32-.3.5-.15.18-.31.4-.44.53-.15.15-.3.31-.13.6.17.3.77 1.27 1.66 2.06 1.14 1.02 2.1 1.34 2.4 1.49.3.15.47.13.65-.08.18-.2.76-.88.96-1.18.2-.3.4-.25.66-.15.27.1 1.7.8 2 .95.3.15.5.22.57.35.07.13.07.75-.17 1.43Z" />
+    </svg>
+  );
+}
+function PeopleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3" aria-hidden="true">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M17 20v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8 9v-1a4 4 0 0 0-3-3.87M14 3.13a4 4 0 0 1 0 7.75"
+      />
+    </svg>
+  );
+}
+
+const STAT_CARD_TONES = {
+  primary: "bg-primary/10 text-primary",
+  warning: "bg-warning text-warning-foreground",
+  danger: "bg-danger/10 text-danger",
+  info: "bg-coral-50 text-coral-700",
+} as const;
+
+function StatCard({ tone, value, label }: { tone: keyof typeof STAT_CARD_TONES; value: number; label: string }) {
+  return (
+    <div className={`flex min-w-[6.5rem] flex-1 flex-col items-start gap-0.5 rounded-xl px-3 py-2 sm:flex-none ${STAT_CARD_TONES[tone]}`}>
+      <span className="text-lg font-bold leading-tight">{value}</span>
+      <span className="text-[11px] font-medium opacity-80">{label}</span>
+    </div>
+  );
+}
 
 export function AgendaView({
   date,
@@ -71,6 +111,8 @@ export function AgendaView({
   slotMinutes,
   professionals,
   patients,
+  patientPhoneById,
+  cancelledCount,
   currentProfessionalId,
 }: {
   date: string;
@@ -79,13 +121,17 @@ export function AgendaView({
   slotMinutes: number;
   professionals: ProfessionalOption[];
   patients: PatientOption[];
+  patientPhoneById: Record<string, string | null>;
+  cancelledCount: number;
   currentProfessionalId?: string;
 }) {
   const router = useRouter();
   const [panel, setPanel] = useState<
     { mode: "create"; roomId: string; hour: number } | { mode: "edit"; sessionId: string; roomId: string } | null
   >(null);
-  const [selectedRoomId, setSelectedRoomId] = useState(rooms[0]?.id ?? "");
+  const [mobileRoomId, setMobileRoomId] = useState(rooms[0]?.id ?? "");
+  const [filterProfessionalId, setFilterProfessionalId] = useState("");
+  const [filterRoomId, setFilterRoomId] = useState("");
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -115,6 +161,22 @@ export function AgendaView({
   const todayStr = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo" }).format(now);
   const showNowLine = date === todayStr && nowMinutes >= DAY_START_MINUTES && nowMinutes <= DAY_END_MINUTES;
 
+  const visibleRooms = filterRoomId ? rooms.filter((room) => room.id === filterRoomId) : rooms;
+  const visibleSessions = sessions.filter(
+    (session) =>
+      (!filterProfessionalId || session.professionalId === filterProfessionalId) &&
+      visibleRooms.some((room) => room.id === session.roomId),
+  );
+
+  // Contadores do dia exibido — sem filtro de fisio/sala aplicado, é uma
+  // visão do dia todo. `cancelledCount` vem do servidor (page.tsx) porque
+  // `sessions` aqui só traz turmas com `status = 'ativa'` — uma turma
+  // cancelada por completo não está neste array (ver countCancelledAttendees).
+  const allAttendeesToday = sessions.flatMap((session) => session.attendees);
+  const sessionsCount = sessions.length;
+  const pendingCount = allAttendeesToday.filter((attendee) => attendee.status === "agendada").length;
+  const activeRoomsCount = rooms.length;
+
   const occupiedByRoom = useMemo(() => {
     const map = new Map<string, Set<number>>();
     for (const session of sessions) {
@@ -130,18 +192,38 @@ export function AgendaView({
   }, [sessions, slotMinutes]);
 
   /**
-   * Sessão que *começa* neste slot — por índice de slot (não igualdade
-   * exata de minuto), porque o horário real de uma sessão nem sempre cai
-   * exatamente num múltiplo de `slotMinutes` a partir de 07:00 (a duração
-   * padrão pode mudar, ou a sessão foi criada com horário livre).
+   * Sessão visível (após filtro de fisio/sala) que *começa* neste slot — por
+   * índice de slot (não igualdade exata de minuto), porque o horário real de
+   * uma sessão nem sempre cai exatamente num múltiplo de `slotMinutes` a
+   * partir de 07:00 (a duração padrão pode mudar, ou a sessão foi criada com
+   * horário livre).
    */
   function findSession(roomId: string, slotMinute: number) {
     const slotIndex = (slotMinute - DAY_START_MINUTES) / slotMinutes;
-    return sessions.find((session) => {
+    return visibleSessions.find((session) => {
       if (session.roomId !== roomId) return false;
       const startMinutes = minutesSinceMidnightSaoPaulo(session.scheduledStart);
       return Math.floor((startMinutes - DAY_START_MINUTES) / slotMinutes) === slotIndex;
     });
+  }
+
+  function isRoomActiveNow(roomId: string): boolean {
+    if (date !== todayStr) return false;
+    return sessions.some((session) => {
+      if (session.roomId !== roomId) return false;
+      const startMinutes = minutesSinceMidnightSaoPaulo(session.scheduledStart);
+      const endMinutes = minutesSinceMidnightSaoPaulo(session.scheduledEnd);
+      return nowMinutes >= startMinutes && nowMinutes < endMinutes;
+    });
+  }
+
+  function openQuickCreate() {
+    const room = visibleRooms[0] ?? rooms[0];
+    if (!room) return;
+    const occupied = occupiedByRoom.get(room.id);
+    const freeSlotIndex = slots.findIndex((_, index) => !occupied?.has(index));
+    const hour = freeSlotIndex === -1 ? DAY_START_MINUTES : (slots[freeSlotIndex] ?? DAY_START_MINUTES);
+    setPanel({ mode: "create", roomId: room.id, hour });
   }
 
   async function withRefresh(action: () => Promise<unknown>) {
@@ -228,28 +310,69 @@ export function AgendaView({
 
   function SessionCard({ session, compact }: { session: SessionView; compact?: boolean }) {
     const active = session.attendees.filter((attendee) => attendee.status !== "cancelada");
+    const professional = professionals.find((p) => p.id === session.professionalId);
+    const singlePhone = active.length === 1 ? (patientPhoneById[active[0]?.patientId ?? ""] ?? null) : null;
+    const whatsappHref = singlePhone ? `https://wa.me/${singlePhone.replace("+", "")}` : null;
+
     return (
-      <button
-        type="button"
-        onClick={() => setPanel({ mode: "edit", sessionId: session.id, roomId: session.roomId })}
-        className={`z-10 flex flex-col gap-1 rounded-md bg-primary/10 p-2 text-left text-xs ${
+      <div
+        className={`z-10 flex items-start gap-1 rounded-md bg-primary/10 p-2 text-xs ${
           compact ? "h-full w-full" : "absolute inset-x-1 top-1"
         }`}
       >
+        <button
+          type="button"
+          onClick={() => setPanel({ mode: "edit", sessionId: session.id, roomId: session.roomId })}
+          className="flex min-w-0 flex-1 flex-col gap-1 text-left"
+        >
+          {!compact ? (
+            <span className="font-semibold text-muted-foreground">
+              {formatTime(session.scheduledStart)}–{formatTime(session.scheduledEnd)}
+            </span>
+          ) : null}
+          {active.map((attendee) => (
+            <span key={attendee.id} className="flex items-center justify-between gap-1">
+              <span className="truncate font-medium">{attendee.patientName ?? "Paciente"}</span>
+              <StatusBadge tone={STATUS_TONES[attendee.status] ?? "neutral"} className="shrink-0">
+                {STATUS_LABELS[attendee.status] ?? attendee.status}
+              </StatusBadge>
+            </span>
+          ))}
+          {!compact && professional ? (
+            <span className="mt-0.5 flex items-center gap-1.5">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[9px] font-bold text-primary">
+                {initials(professional.name)}
+              </span>
+              <span className="truncate text-[11px] text-muted-foreground">{professional.name}</span>
+            </span>
+          ) : null}
+        </button>
         {!compact ? (
-          <span className="font-semibold text-muted-foreground">
-            {formatTime(session.scheduledStart)}–{formatTime(session.scheduledEnd)}
-          </span>
+          <div className="flex shrink-0 flex-col gap-1">
+            {whatsappHref ? (
+              <a
+                href={whatsappHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Abrir conversa no WhatsApp"
+                aria-label="Abrir conversa no WhatsApp"
+                className="flex h-6 w-6 items-center justify-center rounded-md border border-input-border bg-background text-primary hover:bg-muted"
+              >
+                <WhatsAppIcon />
+              </a>
+            ) : null}
+            <button
+              type="button"
+              title="Mais opções"
+              aria-label="Mais opções"
+              onClick={() => setPanel({ mode: "edit", sessionId: session.id, roomId: session.roomId })}
+              className="flex h-6 w-6 items-center justify-center rounded-md border border-input-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              …
+            </button>
+          </div>
         ) : null}
-        {active.map((attendee) => (
-          <span key={attendee.id} className="flex items-center justify-between gap-1">
-            <span className="truncate font-medium">{attendee.patientName ?? "Paciente"}</span>
-            <StatusBadge tone={STATUS_TONES[attendee.status] ?? "neutral"} className="shrink-0">
-              {STATUS_LABELS[attendee.status] ?? attendee.status}
-            </StatusBadge>
-          </span>
-        ))}
-      </button>
+      </div>
     );
   }
 
@@ -272,12 +395,33 @@ export function AgendaView({
     );
   }
 
-  const mobileRoom = rooms.find((room) => room.id === selectedRoomId) ?? rooms[0];
+  const mobileRoom = visibleRooms.find((room) => room.id === mobileRoomId) ?? visibleRooms[0];
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 pb-20 md:pb-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold">Agenda</h1>
+        <div className="flex gap-1 rounded-lg bg-muted p-1 text-sm font-medium">
+          <button type="button" className="rounded-md bg-background px-3 py-1.5 text-foreground shadow-sm">
+            Dia
+          </button>
+          <button
+            type="button"
+            disabled
+            title="Em breve"
+            className="cursor-not-allowed rounded-md px-3 py-1.5 text-muted-foreground/60"
+          >
+            Semana
+          </button>
+          <button
+            type="button"
+            disabled
+            title="Em breve"
+            className="cursor-not-allowed rounded-md px-3 py-1.5 text-muted-foreground/60"
+          >
+            Mês
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -291,30 +435,66 @@ export function AgendaView({
           <Link href={`/agenda?date=${nextWeek}`} className="flex h-8 w-8 items-center justify-center rounded-md border border-input-border text-sm hover:bg-muted">
             ›
           </Link>
+          <Link href={`/agenda?date=${new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo" }).format(new Date())}`} className="rounded-md border border-input-border px-3 py-1.5 text-sm font-medium hover:bg-muted">
+            Hoje
+          </Link>
         </div>
-        <Link href={`/agenda?date=${new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo" }).format(new Date())}`} className="rounded-md border border-input-border px-3 py-1.5 text-sm font-medium hover:bg-muted">
-          Hoje
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            aria-label="Filtrar por fisioterapeuta"
+            value={filterProfessionalId}
+            onChange={(event) => setFilterProfessionalId(event.target.value)}
+            className="min-w-[10rem]"
+          >
+            <option value="">Todos os fisioterapeutas</option>
+            {professionals.map((professional) => (
+              <option key={professional.id} value={professional.id}>
+                {professional.name}
+              </option>
+            ))}
+          </Select>
+          <Select
+            aria-label="Filtrar por sala"
+            value={filterRoomId}
+            onChange={(event) => setFilterRoomId(event.target.value)}
+            className="min-w-[9rem]"
+          >
+            <option value="">Todas as salas</option>
+            {rooms.map((room) => (
+              <option key={room.id} value={room.id}>
+                {room.name}
+              </option>
+            ))}
+          </Select>
+        </div>
       </div>
 
-      <div className="flex gap-1.5">
-        {weekDays.map((day) => (
-          <Link
-            key={day.date}
-            href={`/agenda?date=${day.date}`}
-            className={`flex w-14 flex-col items-center justify-center rounded-lg py-1.5 ${
-              day.selected ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted"
-            }`}
-          >
-            <span className="text-[10px] opacity-75">{day.label}</span>
-            <span className="text-sm font-bold">{day.dayLabel}</span>
-          </Link>
-        ))}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex gap-1.5">
+          {weekDays.map((day) => (
+            <Link
+              key={day.date}
+              href={`/agenda?date=${day.date}`}
+              className={`flex w-14 flex-col items-center justify-center rounded-lg py-1.5 ${
+                day.selected ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted"
+              }`}
+            >
+              <span className="text-[10px] opacity-75">{day.label}</span>
+              <span className="text-sm font-bold">{day.dayLabel}</span>
+            </Link>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <StatCard tone="primary" value={sessionsCount} label="Sessões hoje" />
+          <StatCard tone="warning" value={pendingCount} label="Pendentes" />
+          <StatCard tone="danger" value={cancelledCount} label="Cancelada" />
+          <StatCard tone="info" value={activeRoomsCount} label="Salas ativas" />
+        </div>
       </div>
 
       <p className="text-sm font-semibold text-muted-foreground">{formatDateLongPtBr(date)}</p>
 
-      {rooms.length === 0 ? (
+      {visibleRooms.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nenhuma sala ativa cadastrada.</p>
       ) : (
         <>
@@ -323,19 +503,27 @@ export function AgendaView({
             <div
               className="relative grid min-w-max"
               style={{
-                gridTemplateColumns: `4.5rem repeat(${rooms.length}, minmax(11rem, 1fr))`,
+                gridTemplateColumns: `4.5rem repeat(${visibleRooms.length}, minmax(11rem, 1fr))`,
                 gridTemplateRows: `2.75rem repeat(${slotCount}, 4.5rem)`,
               }}
             >
               <div className="border-b border-border bg-muted/40" style={{ gridColumn: 1, gridRow: 1 }} />
-              {rooms.map((room, roomIndex) => (
+              {visibleRooms.map((room, roomIndex) => (
                 <div
                   key={room.id}
                   className="flex items-center justify-center gap-1.5 border-b border-border bg-muted/40 text-sm font-semibold"
                   style={{ gridColumn: roomIndex + 2, gridRow: 1 }}
                 >
+                  <span
+                    className={`h-2 w-2 shrink-0 rounded-full ${isRoomActiveNow(room.id) ? "bg-primary" : "bg-transparent"}`}
+                    aria-hidden="true"
+                  />
                   {room.name}
-                  <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+                  <span
+                    className="flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground"
+                    aria-label={`Capacidade: ${room.capacity}`}
+                  >
+                    <PeopleIcon />
                     {room.capacity}
                   </span>
                 </div>
@@ -351,7 +539,7 @@ export function AgendaView({
                 </div>
               ))}
 
-              {rooms.map((room, roomIndex) =>
+              {visibleRooms.map((room, roomIndex) =>
                 slots.map((slotMinute, slotIndex) => (
                   <div
                     key={`${room.id}-${slotMinute}`}
@@ -365,8 +553,8 @@ export function AgendaView({
                 )),
               )}
 
-              {sessions.map((session) => {
-                const roomIndex = rooms.findIndex((room) => room.id === session.roomId);
+              {visibleSessions.map((session) => {
+                const roomIndex = visibleRooms.findIndex((room) => room.id === session.roomId);
                 if (roomIndex === -1) return null;
                 const startMinutes = minutesSinceMidnightSaoPaulo(session.scheduledStart);
                 const endMinutes = minutesSinceMidnightSaoPaulo(session.scheduledEnd);
@@ -405,11 +593,11 @@ export function AgendaView({
           {/* Mobile: uma sala por vez, lista de horários */}
           <div className="flex flex-col gap-3 md:hidden">
             <div className="flex gap-1.5">
-              {rooms.map((room) => (
+              {visibleRooms.map((room) => (
                 <button
                   key={room.id}
                   type="button"
-                  onClick={() => setSelectedRoomId(room.id)}
+                  onClick={() => setMobileRoomId(room.id)}
                   className={`flex-1 rounded-lg py-2 text-xs font-semibold ${
                     room.id === mobileRoom?.id ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
                   }`}
@@ -442,6 +630,15 @@ export function AgendaView({
           </div>
         </>
       )}
+
+      <button
+        type="button"
+        onClick={openQuickCreate}
+        aria-label="Nova sessão"
+        className="fixed bottom-20 left-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-2xl font-light leading-none text-primary-foreground shadow-lg hover:opacity-90 md:bottom-6 md:left-6"
+      >
+        +
+      </button>
 
       {panel ? (
         (() => {

@@ -88,6 +88,15 @@ export interface SchedulingRepository {
    * clínica para esse range, este repositório não conhece conceito de dia.
    */
   listSessions(filter: ListSessionsFilter, tx?: Tx): Promise<SessionWithAttendees[]>;
+  /**
+   * Conta attendees com `status = 'cancelada'` no intervalo, independente do
+   * `sessions.status` da turma. Necessário porque `listSessions` só retorna
+   * `sessions.status = 'ativa'` (ADR-0015): quando o último attendee ativo é
+   * cancelado, a session inteira vira `cancelada` e some de `listSessions` —
+   * sem este método, uma turma cancelada por completo ficaria invisível para
+   * qualquer contagem de "cancelamentos do dia".
+   */
+  countCancelledAttendees(filter: ListSessionsFilter, tx?: Tx): Promise<number>;
 }
 
 /**
@@ -646,6 +655,28 @@ export function createSchedulingRepository(db: DbClient, clinicId: string): Sche
         ...session,
         attendees: attendeesBySessionId.get(session.id) ?? [],
       }));
+    },
+
+    async countCancelledAttendees(filter, tx) {
+      const executor = tx ?? db;
+      const conditions = [
+        eq(sessionAttendees.clinicId, clinicId),
+        eq(sessionAttendees.status, "cancelada"),
+        overlapsRange(sessions.scheduledStart, sessions.scheduledEnd, filter.rangeStart, filter.rangeEnd),
+      ];
+      if (filter.roomId) {
+        conditions.push(eq(sessions.roomId, filter.roomId));
+      }
+      if (filter.professionalId) {
+        conditions.push(eq(sessions.professionalId, filter.professionalId));
+      }
+
+      const [row] = await executor
+        .select({ count: sql<number>`count(*)::int` })
+        .from(sessionAttendees)
+        .innerJoin(sessions, eq(sessionAttendees.sessionId, sessions.id))
+        .where(and(...conditions));
+      return row?.count ?? 0;
     },
   };
 }
