@@ -13,7 +13,7 @@ const variantClasses: Record<ButtonVariant, string> = {
  * para um link navegar com a cara de botão, sem duplicar as classes.
  */
 export function buttonClassName(variant: ButtonVariant = "primary", className = ""): string {
-  return `rounded-md px-4 py-2 text-sm font-medium transition-opacity disabled:cursor-not-allowed disabled:opacity-50 ${variantClasses[variant]} ${className}`;
+  return `rounded-md px-4 py-2 text-sm font-medium transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 ${variantClasses[variant]} ${className}`;
 }
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {

@@ -84,4 +84,61 @@ describe("withSerializableRetry", () => {
     await expect(withSerializableRetry(fn)).rejects.toBe(wrappedDomainError);
     expect(fn).toHaveBeenCalledTimes(1);
   });
+
+  it("usa o erro específico de buildConflictError após esgotar as tentativas, em vez de SchedulingConflictError", async () => {
+    class CustomWriteConflictError extends Error {
+      constructor(public readonly cause: unknown) {
+        super("conflito específico");
+        this.name = "CustomWriteConflictError";
+      }
+    }
+    const fn = vi.fn().mockRejectedValue(makeWrappedSerializationFailure());
+    const buildConflictError = vi.fn((lastError: unknown) => new CustomWriteConflictError(lastError));
+
+    const error = await withSerializableRetry(fn, buildConflictError).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(CustomWriteConflictError);
+    expect(error).not.toBeInstanceOf(SchedulingConflictError);
+    expect(fn).toHaveBeenCalledTimes(3);
+  });
+
+  it("passa o último erro de serialization_failure para buildConflictError", async () => {
+    const firstFailure = makeWrappedSerializationFailure();
+    const secondFailure = makeWrappedSerializationFailure();
+    const thirdFailure = makeWrappedSerializationFailure();
+    const fn = vi
+      .fn()
+      .mockRejectedValueOnce(firstFailure)
+      .mockRejectedValueOnce(secondFailure)
+      .mockRejectedValueOnce(thirdFailure);
+    const buildConflictError = vi.fn((lastError: unknown) => new Error("conflito", { cause: lastError }));
+
+    await withSerializableRetry(fn, buildConflictError).catch(() => undefined);
+
+    expect(buildConflictError).toHaveBeenCalledTimes(1);
+    expect(buildConflictError).toHaveBeenCalledWith(thirdFailure);
+  });
+
+  it("não chama buildConflictError quando fn tem sucesso, mesmo após um retry", async () => {
+    const fn = vi
+      .fn()
+      .mockRejectedValueOnce(makeWrappedSerializationFailure())
+      .mockResolvedValueOnce("ok-na-segunda");
+    const buildConflictError = vi.fn((lastError: unknown) => new Error("não deveria ser chamado", { cause: lastError }));
+
+    const result = await withSerializableRetry(fn, buildConflictError);
+
+    expect(result).toBe("ok-na-segunda");
+    expect(buildConflictError).not.toHaveBeenCalled();
+  });
+
+  it("não aplica retry nem chama buildConflictError para um erro que não é serialization_failure", async () => {
+    const domainError = new Error("erro de domínio simulado");
+    const fn = vi.fn().mockRejectedValue(domainError);
+    const buildConflictError = vi.fn((lastError: unknown) => new Error("não deveria ser chamado", { cause: lastError }));
+
+    await expect(withSerializableRetry(fn, buildConflictError)).rejects.toBe(domainError);
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(buildConflictError).not.toHaveBeenCalled();
+  });
 });

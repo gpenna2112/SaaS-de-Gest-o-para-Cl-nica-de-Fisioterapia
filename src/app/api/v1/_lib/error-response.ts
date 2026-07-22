@@ -21,6 +21,20 @@ import {
   SessionNotActiveError,
   SessionNotFoundError,
 } from "@/db/repositories/scheduling-repository.errors";
+import {
+  DuplicateProfessionalEmailError,
+  LastGestoraError,
+  ProfessionalRecordNotFoundError,
+  ProfessionalsWriteConflictError,
+} from "@/db/repositories/professionals-repository.errors";
+import { DuplicateRoomNameError, RoomRecordNotFoundError } from "@/db/repositories/rooms-repository.errors";
+import {
+  AttendeeNotRealizadaError,
+  AttendeeRecordNotFoundError,
+  EvolutionAlreadyExistsError,
+  EvolutionNotFoundError,
+  NotEvolutionAuthorError,
+} from "@/db/repositories/evolutions-repository.errors";
 import { logger } from "@/lib/logger";
 import {
   ForbiddenError,
@@ -68,14 +82,22 @@ export function errorResponse(error: unknown): NextResponse {
     error instanceof SchedulingPatientNotFoundError ||
     error instanceof RoomNotFoundError ||
     error instanceof SessionAttendeeNotFoundError ||
-    error instanceof SessionNotFoundError
+    error instanceof SessionNotFoundError ||
+    error instanceof ProfessionalRecordNotFoundError ||
+    error instanceof RoomRecordNotFoundError ||
+    error instanceof EvolutionNotFoundError ||
+    error instanceof AttendeeRecordNotFoundError
   ) {
     return NextResponse.json({ error: error.message }, { status: 404 });
+  }
+  if (error instanceof NotEvolutionAuthorError) {
+    return NextResponse.json({ error: error.message }, { status: 403 });
   }
   if (
     error instanceof ProfessionalInactiveError ||
     error instanceof InvalidPhoneError ||
-    error instanceof PatientInactiveError
+    error instanceof PatientInactiveError ||
+    error instanceof AttendeeNotRealizadaError
   ) {
     return NextResponse.json({ error: error.message }, { status: 422 });
   }
@@ -86,7 +108,12 @@ export function errorResponse(error: unknown): NextResponse {
     error instanceof SchedulingConflictError ||
     error instanceof InvalidStatusTransitionError ||
     error instanceof SessionNotActiveError ||
-    error instanceof PatientAlreadyAttendingError
+    error instanceof PatientAlreadyAttendingError ||
+    error instanceof DuplicateProfessionalEmailError ||
+    error instanceof DuplicateRoomNameError ||
+    error instanceof EvolutionAlreadyExistsError ||
+    error instanceof LastGestoraError ||
+    error instanceof ProfessionalsWriteConflictError
   ) {
     return NextResponse.json({ error: error.message }, { status: 409 });
   }

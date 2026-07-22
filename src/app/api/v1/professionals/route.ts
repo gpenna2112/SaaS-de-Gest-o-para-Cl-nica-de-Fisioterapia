@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { createProfessionalsRepository } from "@/db/repositories/professionals-repository";
-import { requireSessionUser } from "@/modules/auth/session";
+import { createProfessionalSchema } from "@/lib/validation/professional";
+import { requireRole, requireSessionUser } from "@/modules/auth/session";
 import { getDb } from "@/app/_lib/db";
 import { errorResponse } from "../_lib/error-response";
+import { parseJsonBody } from "../_lib/parse-json-body";
 
 export async function GET(request: Request) {
   try {
@@ -17,6 +19,28 @@ export async function GET(request: Request) {
     const professionals = await repository.listProfessionals({ activeOnly });
 
     return NextResponse.json({ professionals });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+/**
+ * Cadastro de equipe é ação de gestão da clínica, não do dia a dia
+ * assistencial — restrito a `gestora` (ADR-0017 §3, primeiro uso real de
+ * `requireRole` no projeto).
+ */
+export async function POST(request: Request) {
+  try {
+    const sessionUser = await requireRole(request.headers, ["gestora"]);
+    const body = await parseJsonBody(request, createProfessionalSchema);
+
+    const repository = createProfessionalsRepository(getDb(), sessionUser.clinicId);
+    const professional = await repository.createProfessional(body, {
+      type: "professional",
+      professionalId: sessionUser.professionalId,
+    });
+
+    return NextResponse.json({ professional }, { status: 201 });
   } catch (error) {
     return errorResponse(error);
   }

@@ -8,7 +8,7 @@ PostgreSQL + Drizzle (ADR-0002, ADR-0003). Schema, migrações SQL e cliente de 
 - `migrations/` — `0000` gerado por `npm run db:generate`; `0001` escrita à mão (ver nota abaixo); `0002` (`patients.updated_at`) gerada normalmente, mudança aditiva simples sem ambiguidade. Trechos manuais onde o builder tipado do Drizzle não expressa (extensão `btree_gist` + dois índices GiST parciais em `sessions`).
 - `client.ts` — `createDbClient(connectionString)`, uma factory (sem conexão eager no import). Exporta também `Tx` (transação já aberta) e `QueryExecutor` (`DbClient | Tx`), tipos compartilhados entre repositórios para composição atômica entre módulos.
 - `repositories/` — repositórios tenant-scoped (ADR-0007): `scheduling-repository.ts` (ADR-0015), `notifications-repository.ts` (ADR-0016), `patients-repository.ts`. Exceção deliberada: `professionals-auth-repository.ts` **não** é tenant-scoped (resolve identidade antes de a clínica ser conhecida) — ver ADR-0017 e `src/modules/auth/README.md`. Ver `repositories/README.md` para os testes de integração (exigem Postgres real, não rodam em `npm run test`).
-- `transaction-retry.ts` — `withSerializableRetry`, genérico e reutilizável por outros repositórios futuros (não é específico de agenda).
+- `transaction-retry.ts` — `withSerializableRetry`, genérico (aceita um `buildConflictError` opcional para o erro de domínio final, default `SchedulingConflictError`); usado por `scheduling-repository.ts`/`scheduling-service.ts` e por `professionals-repository.ts` (invariante de última gestora ativa, com `ProfessionalsWriteConflictError` próprio).
 
 ## Decisões relevantes que moldam este schema
 

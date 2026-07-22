@@ -93,10 +93,6 @@ describe("SchedulingRepository — modelo session/session_attendees", () => {
     await cleanupClinic(fixture.clinicId);
   });
 
-  afterAll(async () => {
-    await db.$client.end();
-  });
-
   it("cria sessão de Pilates com múltiplos pacientes na mesma turma, um único profissional", async () => {
     const { clinicId, professionalId, patientIds } = fixture;
     const room = await createRoom(clinicId, 3);
@@ -459,7 +455,7 @@ describe("SchedulingRepository — modelo session/session_attendees", () => {
   });
 });
 
-describe("SchedulingRepository — listSessions", () => {
+describe("SchedulingRepository — rescheduleSession", () => {
   let fixture: TestFixture;
 
   beforeEach(async () => {
@@ -470,8 +466,123 @@ describe("SchedulingRepository — listSessions", () => {
     await cleanupClinic(fixture.clinicId);
   });
 
-  afterAll(async () => {
-    await db.$client.end();
+  it("move sala e horário, grava audit_log", async () => {
+    const { clinicId, professionalId, patientIds } = fixture;
+    const roomA = await createRoom(clinicId, 1);
+    const roomB = await createRoom(clinicId, 1);
+    const repo = createSchedulingRepository(db, clinicId);
+
+    const { session } = await repo.createSession(
+      {
+        professionalId,
+        roomId: roomA.id,
+        scheduledStart: new Date("2026-08-04T09:00:00-03:00"),
+        scheduledEnd: new Date("2026-08-04T09:50:00-03:00"),
+        patientIds: [patientIds[0]!],
+      },
+      { type: "professional", professionalId },
+    );
+
+    const rescheduled = await repo.rescheduleSession(
+      {
+        sessionId: session.id,
+        roomId: roomB.id,
+        scheduledStart: new Date("2026-08-04T14:00:00-03:00"),
+        scheduledEnd: new Date("2026-08-04T14:50:00-03:00"),
+      },
+      { type: "professional", professionalId },
+    );
+
+    expect(rescheduled.roomId).toBe(roomB.id);
+    expect(rescheduled.scheduledStart).toEqual(new Date("2026-08-04T14:00:00-03:00"));
+
+    const logs = await db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.clinicId, clinicId), eq(auditLog.entityId, session.id)));
+    expect(logs.some((entry) => entry.action === "session.rescheduled")).toBe(true);
+  });
+
+  it("impede remarcar para uma sala já ocupada nesse horário", async () => {
+    const { clinicId, professionalId, professionalId2, patientIds } = fixture;
+    const roomA = await createRoom(clinicId, 1);
+    const roomB = await createRoom(clinicId, 1);
+    const repo = createSchedulingRepository(db, clinicId);
+
+    await repo.createSession(
+      {
+        professionalId: professionalId2,
+        roomId: roomB.id,
+        scheduledStart: new Date("2026-08-04T10:00:00-03:00"),
+        scheduledEnd: new Date("2026-08-04T10:50:00-03:00"),
+        patientIds: [patientIds[1]!],
+      },
+      { type: "professional", professionalId: professionalId2 },
+    );
+    const { session } = await repo.createSession(
+      {
+        professionalId,
+        roomId: roomA.id,
+        scheduledStart: new Date("2026-08-04T09:00:00-03:00"),
+        scheduledEnd: new Date("2026-08-04T09:50:00-03:00"),
+        patientIds: [patientIds[0]!],
+      },
+      { type: "professional", professionalId },
+    );
+
+    await expect(
+      repo.rescheduleSession(
+        {
+          sessionId: session.id,
+          roomId: roomB.id,
+          scheduledStart: new Date("2026-08-04T10:00:00-03:00"),
+          scheduledEnd: new Date("2026-08-04T10:50:00-03:00"),
+        },
+        { type: "professional", professionalId },
+      ),
+    ).rejects.toBeInstanceOf(RoomConflictError);
+  });
+
+  it("impede remarcar uma turma com vários pacientes para uma sala menor que a capacidade necessária", async () => {
+    const { clinicId, professionalId, patientIds } = fixture;
+    const roomPilates = await createRoom(clinicId, 3);
+    const roomIndividual = await createRoom(clinicId, 1);
+    const repo = createSchedulingRepository(db, clinicId);
+
+    const { session } = await repo.createSession(
+      {
+        professionalId,
+        roomId: roomPilates.id,
+        scheduledStart: new Date("2026-08-04T09:00:00-03:00"),
+        scheduledEnd: new Date("2026-08-04T09:50:00-03:00"),
+        patientIds: patientIds.slice(0, 3),
+      },
+      { type: "professional", professionalId },
+    );
+
+    await expect(
+      repo.rescheduleSession(
+        {
+          sessionId: session.id,
+          roomId: roomIndividual.id,
+          scheduledStart: new Date("2026-08-04T11:00:00-03:00"),
+          scheduledEnd: new Date("2026-08-04T11:50:00-03:00"),
+        },
+        { type: "professional", professionalId },
+      ),
+    ).rejects.toBeInstanceOf(RoomAtCapacityError);
+  });
+});
+
+describe("SchedulingRepository — listSessions", () => {
+  let fixture: TestFixture;
+
+  beforeEach(async () => {
+    fixture = await setupClinic();
+  });
+
+  afterEach(async () => {
+    await cleanupClinic(fixture.clinicId);
   });
 
   it("retorna sessões ativas dentro do intervalo, com attendees", async () => {
@@ -570,4 +681,68 @@ describe("SchedulingRepository — listSessions", () => {
 
     expect(result).toEqual([]);
   });
+});
+
+describe("SchedulingRepository — listAttendanceHistoryForPatient", () => {
+  let fixture: TestFixture;
+
+  beforeEach(async () => {
+    fixture = await setupClinic();
+  });
+
+  afterEach(async () => {
+    await cleanupClinic(fixture.clinicId);
+  });
+
+  it("retorna o histórico do paciente (qualquer status), mais recente primeiro", async () => {
+    const { clinicId, professionalId, patientIds } = fixture;
+    const room = await createRoom(clinicId, 1);
+    const repo = createSchedulingRepository(db, clinicId);
+
+    const older = await repo.createSession(
+      {
+        professionalId,
+        roomId: room.id,
+        scheduledStart: new Date("2026-09-10T09:00:00-03:00"),
+        scheduledEnd: new Date("2026-09-10T09:50:00-03:00"),
+        patientIds: [patientIds[0]!],
+      },
+      { type: "professional", professionalId },
+    );
+    await repo.updateAttendeeStatus(older.attendees[0]!.id, "realizada", { type: "professional", professionalId });
+
+    const newer = await repo.createSession(
+      {
+        professionalId,
+        roomId: room.id,
+        scheduledStart: new Date("2026-09-11T09:00:00-03:00"),
+        scheduledEnd: new Date("2026-09-11T09:50:00-03:00"),
+        patientIds: [patientIds[0]!],
+      },
+      { type: "professional", professionalId },
+    );
+    await repo.updateAttendeeStatus(newer.attendees[0]!.id, "falta", { type: "professional", professionalId });
+
+    const history = await repo.listAttendanceHistoryForPatient(patientIds[0]!);
+
+    expect(history).toHaveLength(2);
+    expect(history[0]!.attendeeId).toBe(newer.attendees[0]!.id);
+    expect(history[0]!.status).toBe("falta");
+    expect(history[1]!.attendeeId).toBe(older.attendees[0]!.id);
+    expect(history[1]!.status).toBe("realizada");
+  });
+
+  it("paciente sem histórico retorna lista vazia", async () => {
+    const repo = createSchedulingRepository(db, fixture.clinicId);
+    const history = await repo.listAttendanceHistoryForPatient(fixture.patientIds[0]!);
+    expect(history).toEqual([]);
+  });
+});
+
+// Um único afterAll, fora de qualquer describe: `db` é uma conexão módulo-
+// singleton compartilhada por todos os describes deste arquivo — fechá-la
+// dentro do afterAll de cada describe individual encerra a conexão assim
+// que o primeiro describe termina, quebrando os seguintes (CONNECTION_ENDED).
+afterAll(async () => {
+  await db.$client.end();
 });

@@ -1,8 +1,9 @@
-import { and, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { isValidStatusTransition, type AttendeeStatus } from "@/modules/scheduling/session-state-machine";
-import type { DbClient, Tx } from "../client";
-import { auditLog, patients, rooms, sessionAttendees, sessions } from "../schema";
+import { writeAuditLog, type Actor } from "../audit-log";
+import type { DbClient, QueryExecutor, Tx } from "../client";
+import { patients, rooms, sessionAttendees, sessions } from "../schema";
 import { withSerializableRetry } from "../transaction-retry";
 import {
   DuplicatePatientIdsError,
@@ -25,10 +26,7 @@ export type SessionAttendee = typeof sessionAttendees.$inferSelect;
 /** Status da session em si — `ativa`/`cancelada`. Não confundir com AttendeeStatus (por participante). */
 export type SessionStatus = "ativa" | "cancelada";
 
-export interface Actor {
-  type: "professional" | "patient_reply" | "system";
-  professionalId?: string;
-}
+export type { Actor };
 
 export interface CreateSessionInput {
   professionalId: string;
@@ -66,6 +64,16 @@ export interface SessionWithAttendees extends Session {
   attendees: SessionAttendee[];
 }
 
+/** Uma linha do histórico de atendimentos de um paciente — página de detalhe (`/pacientes/[id]`). */
+export interface PatientAttendanceHistoryEntry {
+  attendeeId: string;
+  status: string;
+  scheduledStart: Date;
+  scheduledEnd: Date;
+  roomId: string;
+  professionalId: string;
+}
+
 /**
  * Todo método aceita uma `tx` externa opcional (último parâmetro) para
  * composição atômica com outros repositórios (ex.: notifications) — ver
@@ -88,6 +96,17 @@ export interface SchedulingRepository {
    * clínica para esse range, este repositório não conhece conceito de dia.
    */
   listSessions(filter: ListSessionsFilter, tx?: Tx): Promise<SessionWithAttendees[]>;
+  /**
+   * Leitura simples de um attendee — usada pelo módulo `evolutions` (fora
+   * deste módulo) para validar status (`realizada`) e resolver `patientId`
+   * antes de gravar uma evolução clínica, sem que `evolutions` precise
+   * conhecer a tabela `session_attendees` diretamente (ADR-0016: repositórios
+   * de módulos diferentes compõem via chamadas públicas, nunca import direto
+   * de tabela alheia).
+   */
+  getAttendee(attendeeId: string, tx?: Tx): Promise<SessionAttendee | null>;
+  /** Histórico de atendimentos do paciente (qualquer status, todas as datas), mais recente primeiro. */
+  listAttendanceHistoryForPatient(patientId: string, tx?: Tx): Promise<PatientAttendanceHistoryEntry[]>;
   /**
    * Conta attendees com `status = 'cancelada'` no intervalo, independente do
    * `sessions.status` da turma. Necessário porque `listSessions` só retorna
@@ -158,7 +177,7 @@ async function fetchSession(tx: Tx, clinicId: string, sessionId: string) {
   return session;
 }
 
-async function fetchAttendee(tx: Tx, clinicId: string, attendeeId: string) {
+async function fetchAttendee(tx: QueryExecutor, clinicId: string, attendeeId: string) {
   const [attendee] = await tx
     .select()
     .from(sessionAttendees)
@@ -253,28 +272,6 @@ async function countActiveAttendees(tx: Tx, clinicId: string, sessionId: string)
       ),
     );
   return row?.count ?? 0;
-}
-
-async function writeAuditLog(
-  tx: Tx,
-  clinicId: string,
-  actor: Actor,
-  action: string,
-  entityType: "session" | "session_attendee",
-  entityId: string,
-  before: unknown,
-  after: unknown,
-): Promise<void> {
-  await tx.insert(auditLog).values({
-    clinicId,
-    actorId: actor.type === "professional" ? (actor.professionalId ?? null) : null,
-    actorType: actor.type,
-    action,
-    entityType,
-    entityId,
-    before: before as object | null,
-    after: after as object | null,
-  });
 }
 
 /**
@@ -467,6 +464,13 @@ async function rescheduleSessionCore(
     throw new RoomNotFoundError(input.roomId);
   }
 
+  // Remarcar para uma sala menor não pode deixar participantes já ativos
+  // sem vaga — mesma regra de capacidade que `addAttendee` já aplica.
+  const activeAttendeeCount = await countActiveAttendees(tx, clinicId, input.sessionId);
+  if (activeAttendeeCount > room.capacity) {
+    throw new RoomAtCapacityError(input.roomId);
+  }
+
   if (
     await hasActiveRoomConflict(
       tx,
@@ -655,6 +659,30 @@ export function createSchedulingRepository(db: DbClient, clinicId: string): Sche
         ...session,
         attendees: attendeesBySessionId.get(session.id) ?? [],
       }));
+    },
+
+    async getAttendee(attendeeId, tx) {
+      const executor = tx ?? db;
+      const attendee = await fetchAttendee(executor, clinicId, attendeeId);
+      return attendee ?? null;
+    },
+
+    async listAttendanceHistoryForPatient(patientId, tx) {
+      const executor = tx ?? db;
+      const rows = await executor
+        .select({
+          attendeeId: sessionAttendees.id,
+          status: sessionAttendees.status,
+          scheduledStart: sessions.scheduledStart,
+          scheduledEnd: sessions.scheduledEnd,
+          roomId: sessions.roomId,
+          professionalId: sessions.professionalId,
+        })
+        .from(sessionAttendees)
+        .innerJoin(sessions, eq(sessionAttendees.sessionId, sessions.id))
+        .where(and(eq(sessionAttendees.clinicId, clinicId), eq(sessionAttendees.patientId, patientId)))
+        .orderBy(desc(sessions.scheduledStart));
+      return rows;
     },
 
     async countCancelledAttendees(filter, tx) {

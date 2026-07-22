@@ -1,7 +1,8 @@
 import { and, eq } from "drizzle-orm";
 import { normalizePhone } from "@/modules/patients/phone";
+import { writeAuditLog, type Actor } from "../audit-log";
 import type { DbClient, QueryExecutor, Tx } from "../client";
-import { auditLog, patients, professionals } from "../schema";
+import { patients, professionals } from "../schema";
 import {
   InvalidPhoneError,
   PatientNotFoundError,
@@ -9,12 +10,8 @@ import {
   ProfessionalNotFoundError,
 } from "./patients-repository.errors";
 
+export type { Actor };
 export type Patient = typeof patients.$inferSelect;
-
-export interface Actor {
-  type: "professional" | "patient_reply" | "system";
-  professionalId?: string;
-}
 
 export interface CreatePatientInput {
   primaryProfessionalId: string;
@@ -48,6 +45,7 @@ export interface PatientsRepository {
   listPatients(filter: ListPatientsFilter, tx?: Tx): Promise<Patient[]>;
   updatePatient(patientId: string, input: UpdatePatientInput, actor: Actor, tx?: Tx): Promise<Patient>;
   deactivatePatient(patientId: string, actor: Actor, tx?: Tx): Promise<Patient>;
+  reactivatePatient(patientId: string, actor: Actor, tx?: Tx): Promise<Patient>;
 }
 
 function assertRow<T>(row: T | undefined, message: string): T {
@@ -103,27 +101,6 @@ async function assertActiveProfessional(executor: QueryExecutor, clinicId: strin
   }
 }
 
-async function writeAuditLog(
-  executor: QueryExecutor,
-  clinicId: string,
-  actor: Actor,
-  action: string,
-  entityId: string,
-  before: unknown,
-  after: unknown,
-): Promise<void> {
-  await executor.insert(auditLog).values({
-    clinicId,
-    actorId: actor.type === "professional" ? (actor.professionalId ?? null) : null,
-    actorType: actor.type,
-    action,
-    entityType: "patient",
-    entityId,
-    before: before as object | null,
-    after: after as object | null,
-  });
-}
-
 async function createPatientCore(
   executor: QueryExecutor,
   clinicId: string,
@@ -144,7 +121,16 @@ async function createPatientCore(
     .returning();
   const patient = assertRow(inserted, "Insert de paciente não retornou linha");
 
-  await writeAuditLog(executor, clinicId, actor, "patient.created", patient.id, null, patientAuditSnapshot(patient));
+  await writeAuditLog(
+    executor,
+    clinicId,
+    actor,
+    "patient.created",
+    "patient",
+    patient.id,
+    null,
+    patientAuditSnapshot(patient),
+  );
 
   return patient;
 }
@@ -184,6 +170,7 @@ async function updatePatientCore(
     clinicId,
     actor,
     "patient.updated",
+    "patient",
     updated.id,
     patientAuditSnapshot(current),
     patientAuditSnapshot(updated),
@@ -220,6 +207,43 @@ async function deactivatePatientCore(
     clinicId,
     actor,
     "patient.deactivated",
+    "patient",
+    updated.id,
+    patientAuditSnapshot(current),
+    patientAuditSnapshot(updated),
+  );
+
+  return updated;
+}
+
+async function reactivatePatientCore(
+  executor: QueryExecutor,
+  clinicId: string,
+  patientId: string,
+  actor: Actor,
+): Promise<Patient> {
+  const current = await fetchPatient(executor, clinicId, patientId);
+  if (!current) {
+    throw new PatientNotFoundError([patientId]);
+  }
+  // Idempotente, espelhando deactivatePatientCore.
+  if (current.active) {
+    return current;
+  }
+
+  const [updatedRow] = await executor
+    .update(patients)
+    .set({ active: true, updatedAt: new Date() })
+    .where(and(eq(patients.id, patientId), eq(patients.clinicId, clinicId)))
+    .returning();
+  const updated = assertRow(updatedRow, "Update de reativação não retornou linha");
+
+  await writeAuditLog(
+    executor,
+    clinicId,
+    actor,
+    "patient.reactivated",
+    "patient",
     updated.id,
     patientAuditSnapshot(current),
     patientAuditSnapshot(updated),
@@ -269,6 +293,13 @@ export function createPatientsRepository(db: DbClient, clinicId: string): Patien
         return deactivatePatientCore(externalTx, clinicId, patientId, actor);
       }
       return db.transaction((tx) => deactivatePatientCore(tx, clinicId, patientId, actor));
+    },
+
+    reactivatePatient(patientId, actor, externalTx) {
+      if (externalTx) {
+        return reactivatePatientCore(externalTx, clinicId, patientId, actor);
+      }
+      return db.transaction((tx) => reactivatePatientCore(tx, clinicId, patientId, actor));
     },
   };
 }

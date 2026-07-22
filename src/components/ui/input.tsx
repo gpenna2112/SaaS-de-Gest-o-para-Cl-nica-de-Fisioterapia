@@ -21,7 +21,7 @@ export function Input({
       ) : null}
       <input
         id={id}
-        className={`rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary ${className}`}
+        className={`rounded-md border border-input-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-ring/50 ${className}`}
         {...props}
       />
       {error ? <span className="text-sm text-danger">{error}</span> : null}

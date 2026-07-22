@@ -4,37 +4,32 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Select } from "@/components/ui/select";
+import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SessionPanel, type PanelState, type ProfessionalOption } from "@/components/session-panel";
 import { patch, post } from "@/lib/api-client";
 import {
   addDaysToDateString,
   combineDateAndTimeInSaoPaulo,
+  DAY_END_MINUTES,
+  DAY_START_MINUTES,
   formatDateLongPtBr,
+  formatDateSaoPaulo,
+  formatMinutesAsTime as formatSlotLabel,
+  formatTimeSaoPaulo as formatTime,
   getMondayOfWeek,
+  minutesSinceMidnightSaoPaulo,
 } from "@/modules/scheduling/day-range";
-import { isValidStatusTransition, type AttendeeStatus } from "@/modules/scheduling/session-state-machine";
+import {
+  ATTENDEE_STATUS_LABELS as STATUS_LABELS,
+  ATTENDEE_STATUS_TONES as STATUS_TONES,
+  isValidStatusTransition,
+  type AttendeeStatus,
+} from "@/modules/scheduling/session-state-machine";
 import type { SessionView } from "@/modules/scheduling/session-view";
 import type { PatientOption } from "@/components/patient-multiselect";
 
-const DAY_START_MINUTES = 7 * 60;
-const DAY_END_MINUTES = 20 * 60;
 const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
-
-const STATUS_TONES: Record<string, "neutral" | "success" | "warning" | "danger"> = {
-  agendada: "neutral",
-  confirmada: "success",
-  realizada: "success",
-  falta: "danger",
-  cancelada: "neutral",
-};
-const STATUS_LABELS: Record<string, string> = {
-  agendada: "Agendada",
-  confirmada: "Confirmada",
-  realizada: "Realizada",
-  falta: "Falta",
-  cancelada: "Cancelada",
-};
 
 export interface AgendaRoom {
   id: string;
@@ -43,27 +38,6 @@ export interface AgendaRoom {
   capacity: number;
 }
 
-function minutesSinceMidnightSaoPaulo(date: Date): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Sao_Paulo",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
-  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
-  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
-  return hour * 60 + minute;
-}
-function formatTime(date: Date): string {
-  return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(
-    date,
-  );
-}
-function formatSlotLabel(minutes: number): string {
-  const hour = Math.floor(minutes / 60);
-  const minute = minutes % 60;
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-}
 function WhatsAppIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
@@ -80,22 +54,6 @@ function PeopleIcon() {
         d="M17 20v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8 9v-1a4 4 0 0 0-3-3.87M14 3.13a4 4 0 0 1 0 7.75"
       />
     </svg>
-  );
-}
-
-const STAT_CARD_TONES = {
-  primary: "bg-primary/10 text-primary",
-  warning: "bg-warning text-warning-foreground",
-  danger: "bg-danger/10 text-danger",
-  info: "bg-coral-50 text-coral-700",
-} as const;
-
-function StatCard({ tone, value, label }: { tone: keyof typeof STAT_CARD_TONES; value: number; label: string }) {
-  return (
-    <div className={`flex min-w-[6.5rem] flex-1 flex-col items-start gap-0.5 rounded-xl px-3 py-2 sm:flex-none ${STAT_CARD_TONES[tone]}`}>
-      <span className="text-lg font-bold leading-tight">{value}</span>
-      <span className="text-[11px] font-medium opacity-80">{label}</span>
-    </div>
   );
 }
 
@@ -153,7 +111,7 @@ export function AgendaView({
     .replace(".", "");
 
   const nowMinutes = minutesSinceMidnightSaoPaulo(now);
-  const todayStr = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo" }).format(now);
+  const todayStr = formatDateSaoPaulo(now);
   const showNowLine = date === todayStr && nowMinutes >= DAY_START_MINUTES && nowMinutes <= DAY_END_MINUTES;
 
   const visibleRooms = filterRoomId ? rooms.filter((room) => room.id === filterRoomId) : rooms;
@@ -212,15 +170,6 @@ export function AgendaView({
     });
   }
 
-  function openQuickCreate() {
-    const room = visibleRooms[0] ?? rooms[0];
-    if (!room) return;
-    const occupied = occupiedByRoom.get(room.id);
-    const freeSlotIndex = slots.findIndex((_, index) => !occupied?.has(index));
-    const hour = freeSlotIndex === -1 ? DAY_START_MINUTES : (slots[freeSlotIndex] ?? DAY_START_MINUTES);
-    setPanel({ mode: "create", roomId: room.id, hour });
-  }
-
   async function withRefresh(action: () => Promise<unknown>) {
     await action();
     router.refresh();
@@ -251,10 +200,18 @@ export function AgendaView({
     await withRefresh(() => post(`/api/v1/sessions/${panel.sessionId}/attendees`, { patientId }));
   }
 
+  async function handleReschedule(
+    session: SessionView,
+    input: { roomId: string; scheduledStart: string; scheduledEnd: string },
+  ) {
+    await withRefresh(() => patch(`/api/v1/sessions/${session.id}`, input));
+    setPanel(null);
+  }
+
   async function handleDeleteSession(session: SessionView) {
     // Só cancela quem ainda permite a transição (agendada/confirmada) — um
     // attendee já realizada/falta é registro histórico permanente (ADR-0010),
-    // "excluir" não desfaz o que já aconteceu.
+    // "cancelar" não desfaz o que já aconteceu.
     const cancellable = session.attendees.filter((attendee) =>
       isValidStatusTransition(attendee.status as AttendeeStatus, "cancelada"),
     );
@@ -347,8 +304,8 @@ export function AgendaView({
                 <span className="truncate text-[13px] font-semibold text-foreground">
                   {attendee.patientName ?? "Paciente"}
                 </span>
-                <StatusBadge tone={STATUS_TONES[attendee.status] ?? "neutral"} className="shrink-0">
-                  {STATUS_LABELS[attendee.status] ?? attendee.status}
+                <StatusBadge tone={STATUS_TONES[attendee.status as AttendeeStatus] ?? "neutral"} className="shrink-0">
+                  {STATUS_LABELS[attendee.status as AttendeeStatus] ?? attendee.status}
                 </StatusBadge>
               </span>
             ))}
@@ -442,7 +399,7 @@ export function AgendaView({
           <Link href={`/agenda?date=${nextWeek}`} className="flex h-8 w-8 items-center justify-center rounded-md border border-input-border text-sm hover:bg-muted">
             ›
           </Link>
-          <Link href={`/agenda?date=${new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo" }).format(new Date())}`} className="rounded-md border border-input-border px-3 py-1.5 text-sm font-medium hover:bg-muted">
+          <Link href={`/agenda?date=${formatDateSaoPaulo(new Date())}`} className="rounded-md border border-input-border px-3 py-1.5 text-sm font-medium hover:bg-muted">
             Hoje
           </Link>
         </div>
@@ -495,7 +452,7 @@ export function AgendaView({
           <StatCard tone="primary" value={sessionsCount} label="Sessões hoje" />
           <StatCard tone="warning" value={pendingCount} label="Pendentes" />
           <StatCard tone="danger" value={cancelledCount} label="Cancelada" />
-          <StatCard tone="info" value={activeRoomsCount} label="Salas ativas" />
+          <StatCard tone="neutral" value={activeRoomsCount} label="Salas ativas" />
         </div>
       </div>
 
@@ -638,15 +595,6 @@ export function AgendaView({
         </>
       )}
 
-      <button
-        type="button"
-        onClick={openQuickCreate}
-        aria-label="Nova sessão"
-        className="fixed bottom-20 left-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-2xl font-light leading-none text-primary-foreground shadow-lg hover:opacity-90 md:bottom-6 md:left-6"
-      >
-        +
-      </button>
-
       {panel ? (
         (() => {
           const resolved = panelStateFor();
@@ -656,8 +604,12 @@ export function AgendaView({
               state={resolved}
               professionals={professionals}
               patients={patients}
+              rooms={rooms}
+              slotMinutes={slotMinutes}
               defaultProfessionalId={currentProfessionalId}
+              currentProfessionalId={currentProfessionalId}
               onClose={() => setPanel(null)}
+              onReschedule={handleReschedule}
               onCreate={handleCreate}
               onSetAttendeeStatus={handleSetAttendeeStatus}
               onAddPatient={handleAddPatient}

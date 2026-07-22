@@ -2,7 +2,7 @@ const CLINIC_TIMEZONE = "America/Sao_Paulo";
 const CONFIRMATION_HOUR_LOCAL = "08:00";
 // América/São_Paulo é UTC-3 fixo (Brasil aboliu horário de verão em 2019).
 // Se isso mudar, ou a clínica operar em outro fuso, este cálculo precisa
-// ser revisitado — ver docs/prd.md (clínica única, fuso único no MVP).
+// ser revisitado — ver docs/produto/prd.md (clínica única, fuso único no MVP).
 const CLINIC_UTC_OFFSET = "-03:00";
 
 /**

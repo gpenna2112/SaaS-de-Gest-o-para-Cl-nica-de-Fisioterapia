@@ -42,10 +42,18 @@ function delay(ms: number): Promise<void> {
  * erros de domínio como RoomAtCapacityError — propaga imediatamente, sem
  * retry: só uma corrida transitória de concorrência justifica tentar de novo.
  *
- * Limite pequeno e explícito de tentativas (MAX_ATTEMPTS); esgotado, lança
- * SchedulingConflictError envolvendo o último erro — nunca retry infinito.
+ * Limite pequeno e explícito de tentativas (MAX_ATTEMPTS); esgotado, lança o
+ * erro de conflito do chamador (`buildConflictError`, default
+ * `SchedulingConflictError` — mantém o comportamento histórico de agenda) —
+ * nunca retry infinito. Repositórios fora de `scheduling` (ex.:
+ * `professionals-repository.ts`) devem passar seu próprio erro de domínio
+ * em vez de deixar um `SchedulingConflictError` de agenda vazar para uma
+ * operação que não tem nada a ver com sessões.
  */
-export async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {
+export async function withSerializableRetry<T>(
+  fn: () => Promise<T>,
+  buildConflictError: (lastError: unknown) => Error = (lastError) => new SchedulingConflictError(lastError),
+): Promise<T> {
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -62,5 +70,5 @@ export async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T>
     }
   }
 
-  throw new SchedulingConflictError(lastError);
+  throw buildConflictError(lastError);
 }

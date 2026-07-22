@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useTransition, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState, useTransition, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,19 @@ type SignInResponse = { redirect: boolean; token: string };
 type Mode = "signin" | "signup";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<Card className="w-full max-w-sm" />}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+/** Separado do default export: `useSearchParams` exige um limite de Suspense acima. */
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const from = searchParams.get("from");
+  const destination = from && from.startsWith("/") ? from : "/";
   const [mode, setMode] = useState<Mode>("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -29,7 +41,7 @@ export default function LoginPage() {
           email,
           password,
         });
-        router.push("/");
+        router.push(destination);
         router.refresh();
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
@@ -48,7 +60,7 @@ export default function LoginPage() {
     startTransition(async () => {
       try {
         await post("/api/auth/sign-up/email", { email, password, name });
-        router.push("/");
+        router.push(destination);
         router.refresh();
       } catch {
         // O Better Auth substitui a causa real (hook de vínculo com
@@ -69,7 +81,9 @@ export default function LoginPage() {
 
   return (
     <Card className="w-full max-w-sm">
-      <h1 className="text-lg font-semibold">{mode === "signin" ? "Entrar" : "Ativar acesso"}</h1>
+      <h1 className="text-lg font-semibold">
+        {mode === "signin" ? "Entrar" : "Ativar acesso"}
+      </h1>
       {mode === "signup" ? (
         <p className="mt-1 text-sm text-muted-foreground">
           Use o e-mail que a gestora da clínica já cadastrou para você.
@@ -107,9 +121,17 @@ export default function LoginPage() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
         />
-        {error ? <p className="text-sm text-danger">{error}</p> : null}
+        {error ? (
+          <p role="alert" aria-live="polite" className="text-sm text-danger">
+            {error}
+          </p>
+        ) : null}
         <Button type="submit" disabled={isPending}>
-          {isPending ? "Enviando..." : mode === "signin" ? "Entrar" : "Ativar acesso"}
+          {isPending
+            ? "Enviando..."
+            : mode === "signin"
+              ? "Entrar"
+              : "Ativar acesso"}
         </Button>
       </form>
       <button
@@ -117,7 +139,9 @@ export default function LoginPage() {
         onClick={toggleMode}
         className="mt-4 text-sm text-muted-foreground hover:text-foreground"
       >
-        {mode === "signin" ? "Primeiro acesso? Ative sua conta" : "Já ativou o acesso? Entrar"}
+        {mode === "signin"
+          ? "Primeiro acesso? Ative sua conta"
+          : "Já ativou o acesso? Entrar"}
       </button>
     </Card>
   );
