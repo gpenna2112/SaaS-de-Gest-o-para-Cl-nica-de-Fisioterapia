@@ -16,7 +16,8 @@ concurrency:
 env:
   # Não sensíveis, só para satisfazer o formato exigido por src/lib/env.ts
   # (zod) — nenhum destes valores é usado para acessar sistemas reais.
-  NODE_ENV: test
+  # NODE_ENV fica no padrão de cada comando (o build roda como produção,
+  # que é o modo real do `next build`; não forçamos "test" globalmente).
   BETTER_AUTH_SECRET: ci-github-actions-dummy-secret-not-real-value
   BETTER_AUTH_URL: http://localhost:3000
 
