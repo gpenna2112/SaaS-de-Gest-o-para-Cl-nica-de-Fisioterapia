@@ -11,7 +11,8 @@ const links = [
   { href: "/dashboard", label: "Dashboard", shortLabel: "Dashboard" },
   { href: "/agenda", label: "Agenda", shortLabel: "Agenda" },
   { href: "/pacientes", label: "Pacientes", shortLabel: "Pacientes" },
-  { href: "/equipe", label: "Equipe & Salas", shortLabel: "Equipe" },
+  { href: "/equipe", label: "Equipe", shortLabel: "Equipe" },
+  { href: "/salas", label: "Salas", shortLabel: "Salas" },
 ];
 
 export function Nav({ userName }: { userName: string }) {
@@ -38,9 +39,9 @@ export function Nav({ userName }: { userName: string }) {
                 key={link.href}
                 href={link.href}
                 aria-current={pathname.startsWith(link.href) ? "page" : undefined}
-                className={`rounded-lg px-4 py-1.5 text-sm font-medium ${
+                className={`rounded-lg px-4 py-1.5 text-sm font-semibold ${
                   pathname.startsWith(link.href)
-                    ? "bg-background text-foreground shadow-sm"
+                    ? "bg-teal-50 text-primary"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >

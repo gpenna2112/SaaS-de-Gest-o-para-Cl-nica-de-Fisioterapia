@@ -103,7 +103,7 @@ export function PatientEditForm({
   return (
     <div className="flex max-w-md flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">{patient.name}</h1>
+        <h1 className="text-xl font-extrabold tracking-tight">{patient.name}</h1>
         <StatusBadge tone={active ? "success" : "neutral"}>{active ? "Ativo" : "Inativo"}</StatusBadge>
       </div>
 

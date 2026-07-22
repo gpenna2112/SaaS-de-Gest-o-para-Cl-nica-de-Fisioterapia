@@ -47,6 +47,11 @@
   --color-danger-foreground: #ffffff;
   --color-warning: #fef3c7;
   --color-warning-foreground: #92400e;
+
+  /* Tipografia de produto (design-system.md §6.6/§7) — vars geradas por
+     next/font/google em layout.tsx, aplicadas no <html>. */
+  --font-sans: var(--font-plus-jakarta-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-ibm-plex-mono), ui-monospace, "SFMono-Regular", monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -91,6 +96,7 @@ body {
   flex-direction: column;
   color: var(--color-foreground);
   background: var(--color-background);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

@@ -21,7 +21,7 @@ export default async function NewPatientPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold">Novo paciente</h1>
+      <h1 className="text-xl font-extrabold tracking-tight">Novo paciente</h1>
       <PatientForm
         professionals={professionals.map((professional) => ({
           id: professional.id,

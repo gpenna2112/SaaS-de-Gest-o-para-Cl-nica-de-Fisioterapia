@@ -9,7 +9,12 @@ import { createSchedulingRepository } from "@/db/repositories/scheduling-reposit
 import { DashboardView } from "@/components/dashboard-view";
 import { getSessionUser } from "@/modules/auth/session";
 import { buildDashboardSnapshot } from "@/modules/scheduling/dashboard-view";
-import { dayRangeInSaoPaulo, formatDateLongPtBr, todayInSaoPaulo } from "@/modules/scheduling/day-range";
+import {
+  dayRangeInSaoPaulo,
+  formatDateLongPtBr,
+  minutesSinceMidnightSaoPaulo,
+  todayInSaoPaulo,
+} from "@/modules/scheduling/day-range";
 import { toSessionViews } from "@/modules/scheduling/session-view";
 
 export default async function DashboardPage() {
@@ -53,5 +58,18 @@ export default async function DashboardPage() {
     cancelledCount: cancelledAttendeesCount,
   });
 
-  return <DashboardView snapshot={snapshot} dateLabel={formatDateLongPtBr(date)} date={date} />;
+  const now = new Date();
+  const hour = Math.floor(minutesSinceMidnightSaoPaulo(now) / 60);
+  const period = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
+  const firstName = sessionUser.name.trim().split(/\s+/)[0];
+  const greeting = `${period}, ${firstName}!`;
+
+  return (
+    <DashboardView
+      snapshot={snapshot}
+      dateLabel={formatDateLongPtBr(date)}
+      date={date}
+      greeting={greeting}
+    />
+  );
 }

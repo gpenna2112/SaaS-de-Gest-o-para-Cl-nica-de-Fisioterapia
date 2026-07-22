@@ -32,7 +32,7 @@ export default async function PatientsPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Pacientes</h1>
+        <h1 className="text-xl font-extrabold tracking-tight">Pacientes</h1>
         <LinkButton href="/pacientes/novo">Novo paciente</LinkButton>
       </div>
       <PatientList

@@ -144,7 +144,7 @@ function EvolutionEditor({
   }
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-md bg-muted/50 p-2">
+    <div className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-2">
       <button
         type="button"
         onClick={handleToggleOpen}
@@ -389,7 +389,7 @@ export function SessionPanel({
               <div className="text-xs font-semibold text-muted-foreground">
                 {state.roomName}
               </div>
-              <div className="text-base font-semibold">
+              <div className="text-lg font-extrabold tracking-tight">
                 {state.dayHourLabel}
               </div>
             </div>
@@ -408,7 +408,7 @@ export function SessionPanel({
               Fisioterapeuta
             </span>
             {isEdit ? (
-              <div className="rounded-md border border-input-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+              <div className="rounded-lg border border-input-border bg-muted px-3 py-2 text-sm text-muted-foreground">
                 {state.professionalName}
                 <span className="ml-1 text-xs">(fixo após criada)</span>
               </div>
@@ -444,8 +444,8 @@ export function SessionPanel({
 
             {isEdit ? (
               <div className="flex flex-col gap-2">
-                <ul className="flex flex-col gap-2 rounded-md border border-input-border p-2">
-                  {activeAttendees.map((attendee) => {
+                <ul className="flex flex-col divide-y divide-border rounded-xl border border-input-border p-2">
+                  {activeAttendees.map((attendee, index) => {
                     const targets = QUICK_ACTIONS.filter((qa) =>
                       isValidStatusTransition(
                         attendee.status as AttendeeStatus,
@@ -455,7 +455,7 @@ export function SessionPanel({
                     return (
                       <li
                         key={attendee.id}
-                        className="flex flex-col gap-1.5 text-sm"
+                        className={`flex flex-col gap-1.5 text-sm ${index === 0 ? "pb-2" : "py-2"}`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="truncate">
@@ -555,7 +555,7 @@ export function SessionPanel({
           </div>
 
           {isEdit ? (
-            <div className="flex flex-col gap-2 rounded-md border border-input-border p-3">
+            <div className="flex flex-col gap-2 rounded-xl border border-input-border p-3">
               <button
                 type="button"
                 onClick={() => setRescheduleOpen((current) => !current)}

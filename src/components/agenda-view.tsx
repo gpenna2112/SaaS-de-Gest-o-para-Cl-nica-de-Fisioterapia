@@ -265,12 +265,15 @@ export function AgendaView({
     const professional = professionals.find((p) => p.id === session.professionalId);
     const singlePhone = active.length === 1 ? (patientPhoneById[active[0]?.patientId ?? ""] ?? null) : null;
     const whatsappHref = singlePhone ? `https://wa.me/${singlePhone.replace("+", "")}` : null;
+    // Aguardando confirmação (algum attendee ainda "agendada") ganha
+    // destaque âmbar no bloco em si — hoje só era visível abrindo o card.
+    const isPending = active.some((attendee) => attendee.status === "agendada");
 
     return (
       <div
-        className={`z-10 flex gap-1 overflow-hidden rounded-md border border-primary/25 bg-primary/10 p-1.5 text-xs ${
-          compact ? "h-full w-full" : "absolute inset-1"
-        }`}
+        className={`z-10 flex gap-1 overflow-hidden rounded-md border p-1.5 text-xs ${
+          isPending ? "border-amber-300 bg-warning" : "border-teal-300 bg-teal-50"
+        } ${compact ? "h-full w-full" : "absolute inset-1"}`}
       >
         <button
           type="button"
@@ -285,7 +288,7 @@ export function AgendaView({
               {/* Só o horário final: o inicial já é a própria linha da grade
                   onde o card começa — repetir os dois é redundante e disputa
                   espaço com paciente/fisioterapeuta, que importam mais aqui. */}
-              <span className="shrink-0 truncate text-[10px] font-medium text-muted-foreground">
+              <span className="shrink-0 truncate font-mono text-[10px] font-medium text-muted-foreground">
                 até {formatTime(session.scheduledEnd)}
               </span>
               {professional ? (
@@ -364,7 +367,7 @@ export function AgendaView({
   return (
     <div className="flex flex-col gap-4 pb-20 md:pb-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold">Agenda</h1>
+        <h1 className="text-xl font-extrabold tracking-tight">Agenda</h1>
         <div className="flex gap-1 rounded-lg bg-muted p-1 text-sm font-medium">
           <button type="button" className="rounded-md bg-background px-3 py-1.5 text-foreground shadow-sm">
             Dia
@@ -496,7 +499,7 @@ export function AgendaView({
               {slots.map((slotMinute, slotIndex) => (
                 <div
                   key={slotMinute}
-                  className="border-b border-border p-1.5 pt-1 text-[11px] text-muted-foreground"
+                  className="border-b border-border p-1.5 pt-1 font-mono text-[11px] text-muted-foreground"
                   style={{ gridColumn: 1, gridRow: slotIndex + 2 }}
                 >
                   {formatSlotLabel(slotMinute)}
@@ -576,7 +579,7 @@ export function AgendaView({
                     const session = findSession(mobileRoom.id, slotMinute);
                     return (
                       <li key={slotMinute} className="flex min-h-[3.25rem] items-stretch gap-2 p-1.5">
-                        <span className="w-11 shrink-0 pt-1.5 text-[10px] text-muted-foreground">
+                        <span className="w-11 shrink-0 pt-1.5 font-mono text-[10px] text-muted-foreground">
                           {formatSlotLabel(slotMinute)}
                         </span>
                         <div className="flex-1">
@@ -591,6 +594,22 @@ export function AgendaView({
                   })
                 : null}
             </ul>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm border border-teal-300 bg-teal-50" />
+              Confirmada
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm border border-amber-300 bg-warning" />
+              Aguardando confirmação
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm border border-coral-200 bg-coral-50" />
+              Cancelada
+            </span>
+            <span>{cancelledCount} sessão(ões) cancelada(s) hoje</span>
           </div>
         </>
       )}

@@ -22,7 +22,7 @@ export function Select({
       ) : null}
       <select
         id={id}
-        className={`rounded-md border border-input-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-ring/50 ${className}`}
+        className={`rounded-lg border border-input-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-ring/50 ${className}`}
         {...props}
       >
         {children}

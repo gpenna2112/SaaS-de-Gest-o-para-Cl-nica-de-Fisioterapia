@@ -30,7 +30,7 @@ Toda a tipografia do papel timbrado está desenhada como arte (imagem), não com
 
 Como não há fonte real para herdar, a recomendação (§6.6) é escolher fontes web que ecoem esse caráter sem comprometer legibilidade de produto — a wordmark em si deve continuar existindo só como imagem/SVG de marca, nunca recriada em CSS.
 
-**Estado atual do app (verificado em `src/app/layout.tsx`):** nenhuma fonte customizada carregada hoje — o app usa a pilha `sans-serif` padrão do navegador. A adoção de uma fonte de produto (§7) é, portanto, trabalho novo, não substituição.
+**Estado atual do app (verificado em `src/app/layout.tsx`):** Plus Jakarta Sans (pesos 400–800) e IBM Plex Mono (400/500) carregadas via `next/font/google`, expostas como `--font-plus-jakarta-sans`/`--font-ibm-plex-mono` no `<html>` e mapeadas para `--font-sans`/`--font-mono` em `globals.css` (§7).
 
 ## 4. Espaçamento e estilo do layout
 
@@ -118,7 +118,7 @@ Não existe ainda (fase 2 do roadmap, PRD §6) — nenhuma tela consome cor cate
 
 ### 6.6 Tipografia de produto
 
-Uma família geométrica-humanista moderna e altamente legível para headings + corpo (ex. Plus Jakarta Sans, Manrope ou Sora — todas gratuitas via Google Fonts, com peso variável, e um caráter arredondado que ecoa a curvatura da wordmark sem tentar imitá-la). Uma mono para metadados pontuais (horário exato, telefone, código de sessão) — ex. IBM Plex Mono ou Space Mono — ecoando o bloco de contato do papel timbrado, usada com moderação. Tokens propostos em §7 (`--font-sans`, `--font-mono`) — a fonte em si ainda não está carregada no app (§3).
+Uma família geométrica-humanista moderna e altamente legível para headings + corpo — **Plus Jakarta Sans**, adotada. Uma mono para metadados pontuais (horário exato, telefone, código de sessão) — **IBM Plex Mono**, adotada, ecoando o bloco de contato do papel timbrado, usada com moderação. Tokens em §7 (`--font-sans`, `--font-mono`), carregados no app (§3).
 
 ### 6.7 Forma e motivo decorativo
 
@@ -200,7 +200,7 @@ Proposta de bloco `@theme`, no mesmo formato já usado em `src/app/globals.css` 
   --color-warning: #fef3c7; /* fundo — âmbar já usado hoje em status-badge.tsx (amber-100), agora tokenizado */
   --color-warning-foreground: #92400e; /* texto sobre --color-warning — mesma direção de --color-muted/--color-muted-foreground, não a de --color-primary */
 
-  /* Tipografia (ver §6.6) — ainda não carregada no app, ver §3 */
+  /* Tipografia (ver §6.6) — carregada no app via next/font/google, ver §3 */
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
 
