@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
+import { LastGestoraError } from "@/db/repositories/professionals-repository.errors";
 import { ForbiddenError } from "@/modules/auth/authorization";
 
 vi.mock("@/modules/auth/session", () => ({
@@ -74,6 +75,19 @@ describe("PATCH /api/v1/professionals/[professionalId]", () => {
     const response = await callPatch({ active: false });
 
     expect(response.status).toBe(403);
+  });
+
+  it("retorna 409 com mensagem amigável quando deactivateProfessional rejeita com LastGestoraError", async () => {
+    vi.mocked(requireRole).mockResolvedValue(gestoraUser);
+    const getProfessional = vi.fn().mockResolvedValue(EXISTING);
+    const deactivateProfessional = vi.fn().mockRejectedValue(new LastGestoraError(PROFESSIONAL_ID));
+    vi.mocked(createProfessionalsRepository).mockReturnValue({ getProfessional, deactivateProfessional } as never);
+
+    const response = await callPatch({ active: false });
+
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.error).toBe("Não é possível desativar ou rebaixar a última gestora ativa desta clínica.");
   });
 
   it("retorna 404 quando o profissional não existe", async () => {

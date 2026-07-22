@@ -23,7 +23,9 @@ import {
 } from "@/db/repositories/scheduling-repository.errors";
 import {
   DuplicateProfessionalEmailError,
+  LastGestoraError,
   ProfessionalRecordNotFoundError,
+  ProfessionalsWriteConflictError,
 } from "@/db/repositories/professionals-repository.errors";
 import { DuplicateRoomNameError, RoomRecordNotFoundError } from "@/db/repositories/rooms-repository.errors";
 import {
@@ -109,7 +111,9 @@ export function errorResponse(error: unknown): NextResponse {
     error instanceof PatientAlreadyAttendingError ||
     error instanceof DuplicateProfessionalEmailError ||
     error instanceof DuplicateRoomNameError ||
-    error instanceof EvolutionAlreadyExistsError
+    error instanceof EvolutionAlreadyExistsError ||
+    error instanceof LastGestoraError ||
+    error instanceof ProfessionalsWriteConflictError
   ) {
     return NextResponse.json({ error: error.message }, { status: 409 });
   }

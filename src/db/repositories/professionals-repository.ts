@@ -1,23 +1,17 @@
 import { and, eq } from "drizzle-orm";
-import postgres from "postgres";
 import { writeAuditLog, type Actor } from "../audit-log";
 import type { DbClient, QueryExecutor, Tx } from "../client";
+import { isUniqueViolation } from "../postgres-errors";
 import { professionals } from "../schema";
-import { DuplicateProfessionalEmailError, ProfessionalRecordNotFoundError } from "./professionals-repository.errors";
+import { withSerializableRetry } from "../transaction-retry";
+import {
+  DuplicateProfessionalEmailError,
+  LastGestoraError,
+  ProfessionalRecordNotFoundError,
+  ProfessionalsWriteConflictError,
+} from "./professionals-repository.errors";
 
 const PROFESSIONALS_CLINIC_EMAIL_UNIQUE_CONSTRAINT = "professionals_clinic_email_unique";
-
-/**
- * `assertEmailAvailable` faz um pré-check sob isolamento padrão
- * (READ COMMITTED), que não impede duas requisições concorrentes de
- * passarem no pré-check antes de qualquer commit. Este guard é o
- * backstop: converte a violação real de constraint do Postgres no mesmo
- * erro de domínio que o pré-check já lançaria, em vez de deixar o erro
- * cru do driver escapar para `error-response.ts`.
- */
-function isUniqueViolation(error: unknown, constraintName: string): boolean {
-  return error instanceof postgres.PostgresError && error.code === "23505" && error.constraint_name === constraintName;
-}
 
 export type { Actor };
 export type Professional = typeof professionals.$inferSelect;
@@ -99,6 +93,37 @@ async function assertEmailAvailable(
   }
 }
 
+/**
+ * Lê-para-validar-depois-escreve: sem constraint de banco equivalente para
+ * servir de backstop (não há como expressar "pelo menos uma gestora ativa
+ * por clínica" como constraint simples), a garantia real vem de rodar sob
+ * `SERIALIZABLE` (ver `updateProfessional`/`deactivateProfessional` em
+ * `createProfessionalsRepository`) — duas transações que leem este mesmo
+ * conjunto e escrevem sobre linhas que o predicado da outra leu formam um
+ * ciclo que o Postgres detecta via SSI e aborta uma delas com
+ * `serialization_failure`, disparando o retry de `withSerializableRetry`.
+ */
+async function assertNotLastActiveGestora(
+  executor: QueryExecutor,
+  clinicId: string,
+  professionalId: string,
+): Promise<void> {
+  const otherActiveGestoras = await executor
+    .select({ id: professionals.id })
+    .from(professionals)
+    .where(
+      and(
+        eq(professionals.clinicId, clinicId),
+        eq(professionals.role, "gestora"),
+        eq(professionals.active, true),
+      ),
+    );
+  const remaining = otherActiveGestoras.filter((row) => row.id !== professionalId);
+  if (remaining.length === 0) {
+    throw new LastGestoraError(professionalId);
+  }
+}
+
 async function createProfessionalCore(
   executor: QueryExecutor,
   clinicId: string,
@@ -149,6 +174,9 @@ async function updateProfessionalCore(
   if (input.email && input.email !== current.email) {
     await assertEmailAvailable(executor, clinicId, input.email, professionalId);
   }
+  if (current.active && current.role === "gestora" && input.role && input.role !== "gestora") {
+    await assertNotLastActiveGestora(executor, clinicId, professionalId);
+  }
 
   let updatedRow;
   try {
@@ -198,6 +226,9 @@ async function setActiveCore(
   if (current.active === active) {
     return current;
   }
+  if (!active && current.role === "gestora") {
+    await assertNotLastActiveGestora(executor, clinicId, professionalId);
+  }
 
   const [updatedRow] = await executor
     .update(professionals)
@@ -244,17 +275,35 @@ export function createProfessionalsRepository(db: DbClient, clinicId: string): P
     },
 
     updateProfessional(professionalId, input, actor, externalTx) {
+      // Sem `Tx` externa: pode rebaixar a última gestora ativa (role
+      // gestora -> fisioterapeuta), então roda sob SERIALIZABLE com retry —
+      // ver `assertNotLastActiveGestora`. Com `Tx` externa, o chamador é
+      // quem decide a política transacional do conjunto (ver README).
       if (externalTx) {
         return updateProfessionalCore(externalTx, clinicId, professionalId, input, actor);
       }
-      return db.transaction((tx) => updateProfessionalCore(tx, clinicId, professionalId, input, actor));
+      return withSerializableRetry(
+        () =>
+          db.transaction((tx) => updateProfessionalCore(tx, clinicId, professionalId, input, actor), {
+            isolationLevel: "serializable",
+          }),
+        (lastError) => new ProfessionalsWriteConflictError(lastError),
+      );
     },
 
     deactivateProfessional(professionalId, actor, externalTx) {
+      // Mesmo racional de `updateProfessional`: desativar pode ser a
+      // última gestora ativa, então roda sob SERIALIZABLE com retry.
       if (externalTx) {
         return setActiveCore(externalTx, clinicId, professionalId, actor, false);
       }
-      return db.transaction((tx) => setActiveCore(tx, clinicId, professionalId, actor, false));
+      return withSerializableRetry(
+        () =>
+          db.transaction((tx) => setActiveCore(tx, clinicId, professionalId, actor, false), {
+            isolationLevel: "serializable",
+          }),
+        (lastError) => new ProfessionalsWriteConflictError(lastError),
+      );
     },
 
     reactivateProfessional(professionalId, actor, externalTx) {

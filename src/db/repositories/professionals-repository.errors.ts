@@ -13,3 +13,19 @@ export class DuplicateProfessionalEmailError extends Error {
     this.name = "DuplicateProfessionalEmailError";
   }
 }
+
+/** Impede desativar ou rebaixar a última gestora ativa da clínica — bloquearia toda ação restrita a `role="gestora"` sem via de recuperação pela própria aplicação. */
+export class LastGestoraError extends Error {
+  constructor(public readonly professionalId: string) {
+    super("Não é possível desativar ou rebaixar a última gestora ativa desta clínica.");
+    this.name = "LastGestoraError";
+  }
+}
+
+/** Esgotadas as tentativas de retry sob SERIALIZABLE (`src/db/transaction-retry.ts`) — conflito real de concorrência, nunca um `SchedulingConflictError` de agenda (que não tem relação com profissionais). */
+export class ProfessionalsWriteConflictError extends Error {
+  constructor(public readonly cause: unknown) {
+    super("Conflito de concorrência ao gravar profissional; tente novamente.");
+    this.name = "ProfessionalsWriteConflictError";
+  }
+}

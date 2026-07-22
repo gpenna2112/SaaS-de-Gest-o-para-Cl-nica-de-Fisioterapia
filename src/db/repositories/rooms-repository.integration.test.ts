@@ -184,6 +184,29 @@ describe("RoomsRepository", () => {
     expect(rowsInDb).toHaveLength(1);
   });
 
+  it("duas atualizações concorrentes para o mesmo nome: só uma sucede, a outra recebe DuplicateRoomNameError", async () => {
+    const repo = createRoomsRepository(db, fixture.clinicId);
+    const actor = { type: "professional" as const, professionalId: fixture.actorProfessionalId };
+    const suffix = randomUUID();
+    const target = `Sala Update Race Target ${suffix}`;
+    const roomA = await repo.createRoom({ name: `Sala Update Race A ${suffix}`, type: "individual", capacity: 1 }, actor);
+    const roomB = await repo.createRoom({ name: `Sala Update Race B ${suffix}`, type: "individual", capacity: 1 }, actor);
+
+    const results = await Promise.allSettled([
+      repo.updateRoom(roomA.id, { name: target }, actor),
+      repo.updateRoom(roomB.id, { name: target }, actor),
+    ]);
+
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    const rejected = results.filter((r) => r.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(DuplicateRoomNameError);
+
+    const rowsInDb = await db.select().from(rooms).where(eq(rooms.name, target));
+    expect(rowsInDb).toHaveLength(1);
+  });
+
   it("updateRoom atualiza capacidade e grava audit_log com before/after", async () => {
     const repo = createRoomsRepository(db, fixture.clinicId);
     const actor = { type: "professional" as const, professionalId: fixture.actorProfessionalId };

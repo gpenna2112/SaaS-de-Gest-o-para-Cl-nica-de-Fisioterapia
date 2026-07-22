@@ -1,23 +1,11 @@
 import { and, eq } from "drizzle-orm";
-import postgres from "postgres";
 import { writeAuditLog, type Actor } from "../audit-log";
 import type { DbClient, QueryExecutor, Tx } from "../client";
+import { isUniqueViolation } from "../postgres-errors";
 import { rooms } from "../schema";
 import { DuplicateRoomNameError, RoomRecordNotFoundError } from "./rooms-repository.errors";
 
 const ROOMS_CLINIC_NAME_UNIQUE_CONSTRAINT = "rooms_clinic_name_unique";
-
-/**
- * `assertNameAvailable` faz um pré-check sob isolamento padrão
- * (READ COMMITTED), que não impede duas requisições concorrentes de
- * passarem no pré-check antes de qualquer commit. Este guard é o
- * backstop: converte a violação real de constraint do Postgres no mesmo
- * erro de domínio que o pré-check já lançaria, em vez de deixar o erro
- * cru do driver escapar para `error-response.ts`.
- */
-function isUniqueViolation(error: unknown, constraintName: string): boolean {
-  return error instanceof postgres.PostgresError && error.code === "23505" && error.constraint_name === constraintName;
-}
 
 export type { Actor };
 export type Room = typeof rooms.$inferSelect;

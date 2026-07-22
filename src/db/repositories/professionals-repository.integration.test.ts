@@ -1,10 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createDbClient, type DbClient } from "../client";
 import { auditLog, clinics, professionals } from "../schema";
 import { createProfessionalsRepository } from "./professionals-repository";
-import { DuplicateProfessionalEmailError, ProfessionalRecordNotFoundError } from "./professionals-repository.errors";
+import {
+  DuplicateProfessionalEmailError,
+  LastGestoraError,
+  ProfessionalRecordNotFoundError,
+} from "./professionals-repository.errors";
 
 const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
@@ -195,6 +199,35 @@ describe("ProfessionalsRepository", () => {
     expect(rows).toHaveLength(1);
   });
 
+  it("duas atualizações concorrentes para o mesmo e-mail: só uma sucede, a outra recebe DuplicateProfessionalEmailError", async () => {
+    const repo = createProfessionalsRepository(db, fixture.clinicId);
+    const actor = { type: "professional" as const, professionalId: fixture.actorProfessionalId };
+    const suffix = randomUUID();
+    const target = `update-race-target-${suffix}@test.local`;
+    const profA = await repo.createProfessional(
+      { name: "Update Race A", email: `update-race-a-${suffix}@test.local`, role: "fisioterapeuta" },
+      actor,
+    );
+    const profB = await repo.createProfessional(
+      { name: "Update Race B", email: `update-race-b-${suffix}@test.local`, role: "fisioterapeuta" },
+      actor,
+    );
+
+    const results = await Promise.allSettled([
+      repo.updateProfessional(profA.id, { email: target }, actor),
+      repo.updateProfessional(profB.id, { email: target }, actor),
+    ]);
+
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    const rejected = results.filter((r) => r.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(DuplicateProfessionalEmailError);
+
+    const rows = await db.select().from(professionals).where(eq(professionals.email, target));
+    expect(rows).toHaveLength(1);
+  });
+
   it("updateProfessional atualiza campos e grava audit_log com before/after", async () => {
     const repo = createProfessionalsRepository(db, fixture.clinicId);
     const actor = { type: "professional" as const, professionalId: fixture.actorProfessionalId };
@@ -241,5 +274,160 @@ describe("ProfessionalsRepository", () => {
     const logs = await db.select().from(auditLog).where(eq(auditLog.entityId, created.id));
     expect(logs.filter((entry) => entry.action === "professional.deactivated")).toHaveLength(1);
     expect(logs.filter((entry) => entry.action === "professional.reactivated")).toHaveLength(1);
+  });
+
+  it("deactivateProfessional rejeita desativar a última gestora ativa da clínica", async () => {
+    const repo = createProfessionalsRepository(db, fixture.clinicId);
+    const actor = { type: "professional" as const, professionalId: fixture.actorProfessionalId };
+    const suffix = randomUUID();
+    const gestora = await repo.createProfessional(
+      { name: "Única Gestora", email: `unica-${suffix}@test.local`, role: "gestora" },
+      actor,
+    );
+
+    await expect(repo.deactivateProfessional(gestora.id, actor)).rejects.toBeInstanceOf(LastGestoraError);
+    const stillActive = await repo.getProfessional(gestora.id);
+    expect(stillActive?.active).toBe(true);
+  });
+
+  it("deactivateProfessional permite desativar uma gestora quando outra segue ativa", async () => {
+    const repo = createProfessionalsRepository(db, fixture.clinicId);
+    const actor = { type: "professional" as const, professionalId: fixture.actorProfessionalId };
+    const suffix = randomUUID();
+    const gestoraA = await repo.createProfessional(
+      { name: "Gestora A", email: `gestoraA-${suffix}@test.local`, role: "gestora" },
+      actor,
+    );
+    await repo.createProfessional({ name: "Gestora B", email: `gestoraB-${suffix}@test.local`, role: "gestora" }, actor);
+
+    const deactivated = await repo.deactivateProfessional(gestoraA.id, actor);
+    expect(deactivated.active).toBe(false);
+  });
+
+  it("updateProfessional rejeita rebaixar a última gestora ativa da clínica", async () => {
+    const repo = createProfessionalsRepository(db, fixture.clinicId);
+    const actor = { type: "professional" as const, professionalId: fixture.actorProfessionalId };
+    const suffix = randomUUID();
+    const gestora = await repo.createProfessional(
+      { name: "Única Gestora Role", email: `unica-role-${suffix}@test.local`, role: "gestora" },
+      actor,
+    );
+
+    await expect(
+      repo.updateProfessional(gestora.id, { role: "fisioterapeuta" }, actor),
+    ).rejects.toBeInstanceOf(LastGestoraError);
+    const stillGestora = await repo.getProfessional(gestora.id);
+    expect(stillGestora?.role).toBe("gestora");
+  });
+
+  it("updateProfessional permite rebaixar uma gestora quando outra segue ativa", async () => {
+    const repo = createProfessionalsRepository(db, fixture.clinicId);
+    const actor = { type: "professional" as const, professionalId: fixture.actorProfessionalId };
+    const suffix = randomUUID();
+    const gestoraA = await repo.createProfessional(
+      { name: "Gestora Role A", email: `gestoraRoleA-${suffix}@test.local`, role: "gestora" },
+      actor,
+    );
+    await repo.createProfessional(
+      { name: "Gestora Role B", email: `gestoraRoleB-${suffix}@test.local`, role: "gestora" },
+      actor,
+    );
+
+    const demoted = await repo.updateProfessional(gestoraA.id, { role: "fisioterapeuta" }, actor);
+    expect(demoted.role).toBe("fisioterapeuta");
+  });
+
+  it("deactivateProfessional/updateProfessional permitem mexer numa gestora já inativa sem checar a regra", async () => {
+    const repo = createProfessionalsRepository(db, fixture.clinicId);
+    const actor = { type: "professional" as const, professionalId: fixture.actorProfessionalId };
+    const suffix = randomUUID();
+    const gestora = await repo.createProfessional(
+      { name: "Gestora Inativa", email: `gestora-inativa-${suffix}@test.local`, role: "gestora" },
+      actor,
+    );
+    await repo.createProfessional(
+      { name: "Gestora Backup", email: `gestora-backup-${suffix}@test.local`, role: "gestora" },
+      actor,
+    );
+    await repo.deactivateProfessional(gestora.id, actor);
+
+    const renamed = await repo.updateProfessional(gestora.id, { role: "fisioterapeuta" }, actor);
+    expect(renamed.role).toBe("fisioterapeuta");
+  });
+
+  it("uma gestora já inativa não conta como alternativa — desativar a única ainda ativa continua rejeitado", async () => {
+    const repo = createProfessionalsRepository(db, fixture.clinicId);
+    const actor = { type: "professional" as const, professionalId: fixture.actorProfessionalId };
+    const suffix = randomUUID();
+    const gestoraInativa = await repo.createProfessional(
+      { name: "Gestora Já Inativa", email: `ja-inativa-${suffix}@test.local`, role: "gestora" },
+      actor,
+    );
+    const gestoraAtiva = await repo.createProfessional(
+      { name: "Gestora Restante", email: `restante-${suffix}@test.local`, role: "gestora" },
+      actor,
+    );
+    await repo.deactivateProfessional(gestoraInativa.id, actor);
+
+    await expect(repo.deactivateProfessional(gestoraAtiva.id, actor)).rejects.toBeInstanceOf(LastGestoraError);
+  });
+
+  it("uma gestora ativa de outra clínica não conta como alternativa", async () => {
+    const repo = createProfessionalsRepository(db, fixture.clinicId);
+    const actor = { type: "professional" as const, professionalId: fixture.actorProfessionalId };
+    const suffix = randomUUID();
+    // `fixture.actorProfessionalId` já é uma gestora ativa, mas em `otherClinicId` — não deve contar.
+    const gestora = await repo.createProfessional(
+      { name: "Única Gestora Multi-Tenant", email: `unica-mt-${suffix}@test.local`, role: "gestora" },
+      actor,
+    );
+
+    await expect(repo.deactivateProfessional(gestora.id, actor)).rejects.toBeInstanceOf(LastGestoraError);
+  });
+
+  /**
+   * Limitação conhecida deste teste: `Promise.allSettled` dispara as duas
+   * chamadas de volta a volta no mesmo tick, mas não força as duas
+   * transações a se sobreporem de fato — sem instrumentação invasiva (ex.:
+   * pausar uma transação no meio via um hook de teste) não há como garantir
+   * 100% que o Node/driver as intercala em vez de serializar uma antes da
+   * outra terminar. O resultado "uma sucede, uma falha com LastGestoraError"
+   * é consistente tanto com um conflito SSI real quanto com execução
+   * sequencial disfarçada de concorrente — 5 execuções seguidas sem
+   * flakiness são um indício, não uma prova de que o `40001`/retry foi de
+   * fato exercitado aqui. A garantia real da invariante vem do isolamento
+   * `SERIALIZABLE` em si (mecanismo do Postgres, não deste teste) e do
+   * comportamento do retry, testado deterministicamente e sem depender de
+   * timing em `transaction-retry.test.ts`.
+   */
+  it("[concorrência] remover duas gestoras ativas simultaneamente (desativar + rebaixar): só uma vence, a outra recebe LastGestoraError, e sobra exatamente uma gestora ativa", async () => {
+    const repo = createProfessionalsRepository(db, fixture.clinicId);
+    const actor = { type: "professional" as const, professionalId: fixture.actorProfessionalId };
+    const suffix = randomUUID();
+    const gestoraA = await repo.createProfessional(
+      { name: "Gestora Race A", email: `gestora-race-a-${suffix}@test.local`, role: "gestora" },
+      actor,
+    );
+    const gestoraB = await repo.createProfessional(
+      { name: "Gestora Race B", email: `gestora-race-b-${suffix}@test.local`, role: "gestora" },
+      actor,
+    );
+
+    const results = await Promise.allSettled([
+      repo.deactivateProfessional(gestoraA.id, actor),
+      repo.updateProfessional(gestoraB.id, { role: "fisioterapeuta" }, actor),
+    ]);
+
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    const rejected = results.filter((r) => r.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(LastGestoraError);
+
+    const remainingActiveGestoras = await db
+      .select()
+      .from(professionals)
+      .where(and(eq(professionals.clinicId, fixture.clinicId), eq(professionals.role, "gestora"), eq(professionals.active, true)));
+    expect(remainingActiveGestoras).toHaveLength(1);
   });
 });
