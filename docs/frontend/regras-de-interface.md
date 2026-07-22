@@ -1,6 +1,6 @@
 # Regras de desenvolvimento frontend
 
-Diretrizes gerais de UX/acessibilidade/qualidade para qualquer trabalho de frontend neste projeto. Complementam o [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) (tokens de cor/tipografia derivados da marca) e os ADRs — em caso de conflito com uma decisão já registrada em ADR, o ADR prevalece (ver nota sobre shadcn/ui abaixo).
+Diretrizes gerais de UX/acessibilidade/qualidade para qualquer trabalho de frontend neste projeto. Complementam o [`design-system.md`](design-system.md) (tokens de cor/tipografia derivados da marca) e os ADRs — em caso de conflito com uma decisão já registrada em ADR, o ADR prevalece (ver nota sobre shadcn/ui abaixo).
 
 > **Adotado em 2026-07-21**, a partir de um conjunto de regras trazido pelo usuário.
 
@@ -15,7 +15,7 @@ Diretrizes gerais de UX/acessibilidade/qualidade para qualquer trabalho de front
 
 ## shadcn/ui — nota de escopo importante
 
-Este documento originalmente trazia a regra "antes de criar qualquer UI, buscar no registro shadcn, nunca reinventar um componente já disponível". **Essa regra não se aplica neste projeto** — o [ADR-0018](../adr/0018-design-system-hibrido-shadcn.md) já decidiu explicitamente o oposto: manter os componentes nativos (`Button`, `Card`, `Input`, `Select`, `StatusBadge`, `LinkButton`) como estão, e introduzir shadcn/ui **apenas quando um widget real que HTML nativo não cobre bem aparecer** (`Dialog`, `Combobox`, `Toast`, date picker) — nunca como adoção preventiva. O ADR documenta um incidente real (o CLI do shadcn sobrescreveu `button.tsx` e a paleta da marca sem aviso) que motivou essa decisão.
+Este documento originalmente trazia a regra "antes de criar qualquer UI, buscar no registro shadcn, nunca reinventar um componente já disponível". **Essa regra não se aplica neste projeto** — o [ADR-0018](../arquitetura/adrs/0018-design-system-hibrido-shadcn.md) já decidiu explicitamente o oposto: manter os componentes nativos (`Button`, `Card`, `Input`, `Select`, `StatusBadge`, `LinkButton`) como estão, e introduzir shadcn/ui **apenas quando um widget real que HTML nativo não cobre bem aparecer** (`Dialog`, `Combobox`, `Toast`, date picker) — nunca como adoção preventiva. O ADR documenta um incidente real (o CLI do shadcn sobrescreveu `button.tsx` e a paleta da marca sem aviso) que motivou essa decisão.
 
 Se, no futuro, a decisão for revisitada (ver "Quando revisitar" no próprio ADR-0018), o caminho correto é abrir um novo ADR marcando o 0018 como *Superseded* — não aplicar a regra silenciosamente.
 
@@ -39,7 +39,7 @@ Sempre: validar inline, mostrar erros úteis, preservar o que o usuário digitou
 
 ## Tabelas
 
-Preferir: ordenação, filtro, paginação, estados vazios, skeleton de carregamento, comportamento responsivo. Nunca construir tabela HTML crua se um padrão adequado já existir (nativo ou shadcn, conforme a nota acima) — hoje o projeto ainda não tem um componente de tabela real (ver `DESIGN_SYSTEM.md` §6.3).
+Preferir: ordenação, filtro, paginação, estados vazios, skeleton de carregamento, comportamento responsivo. Nunca construir tabela HTML crua se um padrão adequado já existir (nativo ou shadcn, conforme a nota acima) — hoje o projeto ainda não tem um componente de tabela real (ver `design-system.md` §6.3).
 
 ## Diálogos
 

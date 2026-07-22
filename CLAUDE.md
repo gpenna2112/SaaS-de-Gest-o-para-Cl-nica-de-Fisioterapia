@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Estado atual do projeto
 
-**MVP operacional de ponta a ponta: `scheduling` + `notifications` (outbox, sem worker de envio) + `patients` + `professionals`/`rooms` + `evolutions` + `auth`, com dashboard e CRUD completo de equipe/salas/pacientes sobre `/api/v1`.** Next.js (App Router) + TypeScript estrito + ESLint/Prettier + Vitest + Tailwind v4, estrutura modular alinhada a `docs/architecture.md`. Schema Drizzle (9 tabelas domínio, incluindo `evolutions` desde a migration `0004` + 4 tabelas Better Auth em histórico de migração separado), `scheduling-repository.ts` (ADR-0015; além de `listSessions`/`countCancelledAttendees`, expõe `getAttendee` e `listAttendanceHistoryForPatient` como leituras simples), `notifications-repository.ts` (ADR-0016), `patients-repository.ts`, `professionals-repository.ts`/`rooms-repository.ts` (agora com escrita completa — create/update/deactivate/reactivate, audit_log, únicos por clínica — antes só leitura), `evolutions-repository.ts` (ADR-0019, evolução clínica mínima antecipada da fase 3), `professionals-auth-repository.ts` (ADR-0017) e `scheduling-service.ts` (orquestra scheduling+notifications numa única transação `SERIALIZABLE`, inclui `rescheduleSession`) — tudo validado contra Postgres real. Ver `src/db/README.md`, `src/db/repositories/README.md`, `src/modules/auth/README.md`, `src/modules/evolutions/README.md`, ADR-0015/0016/0017/0019. Módulo `auth`: identidade via Better Auth (e-mail/senha, sessão de 60 dias), provisionamento sem convite por token, `getSessionUser`/`requireSessionUser`/`requireRole` como única via de proteção de rota — `requireRole(["gestora"])` agora tem uso real (escrita de `professionals`/`rooms`).
+**MVP operacional de ponta a ponta: `scheduling` + `notifications` (outbox, sem worker de envio) + `patients` + `professionals`/`rooms` + `evolutions` + `auth`, com dashboard e CRUD completo de equipe/salas/pacientes sobre `/api/v1`.** Next.js (App Router) + TypeScript estrito + ESLint/Prettier + Vitest + Tailwind v4, estrutura modular alinhada a `docs/arquitetura/visao-geral.md`. Schema Drizzle (9 tabelas domínio, incluindo `evolutions` desde a migration `0004` + 4 tabelas Better Auth em histórico de migração separado), `scheduling-repository.ts` (ADR-0015; além de `listSessions`/`countCancelledAttendees`, expõe `getAttendee` e `listAttendanceHistoryForPatient` como leituras simples), `notifications-repository.ts` (ADR-0016), `patients-repository.ts`, `professionals-repository.ts`/`rooms-repository.ts` (agora com escrita completa — create/update/deactivate/reactivate, audit_log, únicos por clínica — antes só leitura), `evolutions-repository.ts` (ADR-0019, evolução clínica mínima antecipada da fase 3), `professionals-auth-repository.ts` (ADR-0017) e `scheduling-service.ts` (orquestra scheduling+notifications numa única transação `SERIALIZABLE`, inclui `rescheduleSession`) — tudo validado contra Postgres real. Ver `src/db/README.md`, `src/db/repositories/README.md`, `src/modules/auth/README.md`, `src/modules/evolutions/README.md`, ADR-0015/0016/0017/0019. Módulo `auth`: identidade via Better Auth (e-mail/senha, sessão de 60 dias), provisionamento sem convite por token, `getSessionUser`/`requireSessionUser`/`requireRole` como única via de proteção de rota — `requireRole(["gestora"])` agora tem uso real (escrita de `professionals`/`rooms`).
 
 Rotas montadas: `/api/auth/[...all]` (Better Auth) e `/api/v1/{patients,professionals,rooms,sessions,session-attendees,evolutions}` (incluindo `PATCH /sessions/[id]` para remarcação, `PATCH /patients|professionals|rooms/[id]` para edição/toggle ativo, `POST /session-attendees/[id]/evolution` + `GET`/`PATCH /evolutions/[id]`) — cascas finas (ADR-0001) sobre os repositórios/serviço acima, com `error-response.ts` mapeando erros de domínio para status HTTP. UI (grupo de rotas `(app)`, guardado por `getSessionUser` no layout; grupo `(public)` para `/login`): **`/dashboard`** (nova tela inicial — sessões hoje, quem atende agora, próximo horário livre, aguardando confirmação, sem role-gating), `/agenda` (grade por sala/horário, timezone explícito via `modules/scheduling/day-range.ts`, criação/edição/**remarcação** de sessão e **registro de evolução** via painel lateral), `/pacientes` + `/pacientes/[id]` (cadastro, **edição/desativação/reativação**, **histórico de sessões e evoluções**), `/equipe` (CRUD de fisioterapeutas/salas só para `role="gestora"`; fisioterapeuta continua vendo só leitura). Leitura inicial das páginas é direta via repositório (Server Component), nunca via self-fetch a `/api/v1`; mutações client-side vão pela API. O módulo `jobs` ainda não foi implementado — notificações são gravadas no outbox mas **nada é de fato enviado ao WhatsApp** (maior lacuna restante do MVP).
 
@@ -12,15 +12,17 @@ Comandos: `npm run dev|build|start|lint|typecheck|test|test:watch|test:integrati
 
 ## O que é este projeto
 
-SaaS de gestão para clínicas de fisioterapia sem recepcionista. MVP = agenda unificada com salas como recurso escasso + confirmação automática via WhatsApp + cadastro de pacientes + registro de sessão em um toque. Leia `docs/prd.md` antes de qualquer trabalho de produto.
+SaaS de gestão para clínicas de fisioterapia sem recepcionista. MVP = agenda unificada com salas como recurso escasso + confirmação automática via WhatsApp + cadastro de pacientes + registro de sessão em um toque. Leia `docs/produto/prd.md` antes de qualquer trabalho de produto.
 
 ## Documentos-fonte (ordem de leitura)
 
-1. `docs/prd.md` — requisitos, escopo do MVP, roadmap das fases 2–5, riscos
-2. `docs/architecture.md` — arquitetura consolidada, módulos e estrutura planejada do código
-3. `docs/adr/` — decisões arquiteturais individuais com alternativas e justificativas
+Índice completo (incluindo os READMEs técnicos que ficam ao lado do código) em `docs/README.md`. Leitura essencial:
+
+1. `docs/produto/prd.md` — requisitos, escopo do MVP, roadmap das fases 2–5, riscos
+2. `docs/arquitetura/visao-geral.md` — arquitetura consolidada, módulos e estrutura atual do código
+3. `docs/arquitetura/adrs/` — decisões arquiteturais individuais com alternativas e justificativas
 4. `docs/development/MCP_GUIDE.md` — para qual servidor MCP usar em cada tipo de tarefa (filesystem, GitHub, Postgres, Playwright, Figma, Context7, Google Drive)
-5. `docs/ui/DESIGN_SYSTEM.md` e `docs/ui/FRONTEND_RULES.md` — antes de qualquer trabalho de frontend: tokens de marca/acessibilidade e regras gerais de UX/formulários/tabelas/componentes. `FRONTEND_RULES.md` documenta explicitamente que a regra "shadcn antes de qualquer UI" **não** se aplica aqui — segue o híbrido do ADR-0018.
+5. `docs/frontend/design-system.md` e `docs/frontend/regras-de-interface.md` — antes de qualquer trabalho de frontend: tokens de marca/acessibilidade e regras gerais de UX/formulários/tabelas/componentes. `regras-de-interface.md` documenta explicitamente que a regra "shadcn antes de qualquer UI" **não** se aplica aqui — segue o híbrido do ADR-0018.
 
 ## Arquitetura aprovada (resumo operacional)
 
@@ -49,7 +51,7 @@ Fora do MVP (PRD §5): pagamentos/cobranças, prontuário e evoluções clínica
 
 ## Processo de decisão
 
-Mudanças de arquitetura exigem um novo ADR em `docs/adr/` (numeração sequencial, formato do `docs/adr/README.md`), marcando o ADR substituído como *Superseded*. Decisões de produto contradizendo o PRD exigem atualização explícita do PRD.
+Mudanças de arquitetura exigem um novo ADR em `docs/arquitetura/adrs/` (numeração sequencial, formato do `docs/arquitetura/adrs/README.md`), marcando o ADR substituído como *Superseded*. Decisões de produto contradizendo o PRD exigem atualização explícita do PRD.
 
 ## Convenções
 

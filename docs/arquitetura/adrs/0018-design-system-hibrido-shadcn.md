@@ -3,6 +3,8 @@
 - **Status:** Aceito
 - **Data:** 2026-07-20
 
+> **Nota de atualização (2026-07-21):** o gatilho previsto em "Quando revisitar" ocorreu — surgiu a primeira necessidade real de confirmação de ações destrutivas (cancelar sessão, desativar paciente/profissional/sala), exatamente o cenário de `Dialog` cogitado na Decisão final. O componente foi introduzido **vendorizado à mão** (`src/components/ui/dialog.tsx` + `confirm-dialog.tsx`), não via `npx shadcn add dialog`: o dry-run do CLI confirmou que ele sobrescreveria `button.tsx` com variants incompatíveis (`default/outline/ghost/destructive` no lugar de `primary/secondary/danger`), reproduzindo o mesmo incidente já registrado no Contexto deste ADR. A decisão híbrida em si **não muda** — os componentes nativos continuam como estão, e o novo `Dialog` usa só tokens já existentes (`--color-background/foreground/border/muted/ring`), sem reconciliar tokens do preset shadcn que não chegaram a ser necessários. Ver `docs/frontend/regras-de-interface.md` para a nota equivalente do lado de regras de UI.
+
 ## Contexto
 
 `src/components/ui/` tem 6 componentes (`Button`, `Card`, `Input`, `Select`, `StatusBadge`, `LinkButton`), ~140 linhas no total: funções simples sobre elementos HTML nativos (`button`, `input`, `select`, `fieldset`/`legend`/`label`, `checkbox`), `className` via template string, sem `cva`, sem `cn()`, sem lib headless. Tema em `globals.css` via `@theme` do Tailwind v4, com paleta própria (`--color-primary` teal `#0f766e`). Nenhuma tela do MVP usa overlay (`Dialog`, `Popover`, `Combobox`, `Dropdown`, `Tooltip`, `Toast`) — inclusive `patient-multiselect.tsx`, que hoje é uma lista de checkboxes, não um combobox.

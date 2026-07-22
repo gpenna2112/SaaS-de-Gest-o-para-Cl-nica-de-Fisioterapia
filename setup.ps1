@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Reproduz em script os passos documentados em README.md ("Como rodar o
-    projeto") e docs/SETUP.md: checa pré-requisitos, instala dependências,
+    projeto") e docs/infraestrutura/ambiente-local.md: checa pré-requisitos, instala dependências,
     cria .env.local (sem sobrescrever um existente), sobe o Postgres de
     desenvolvimento em Docker e aplica migrations + seed.
 
@@ -188,5 +188,5 @@ Próximos passos:
        -d '{"email":"angelica@clinica-exemplo.test","password":"dev12345678","name":"Angélica"}'
   3. Entre em /login com esse e-mail/senha.
 
-Detalhes: docs/SETUP.md e README.md.
+Detalhes: docs/infraestrutura/ambiente-local.md e README.md.
 "@

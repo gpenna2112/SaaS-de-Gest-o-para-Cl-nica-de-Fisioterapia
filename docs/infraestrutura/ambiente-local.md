@@ -1,6 +1,6 @@
 # Setup do ambiente local
 
-Guia para preparar o `clinic-management` em uma máquina nova (Windows, macOS ou Linux). Cobre o caminho automatizado (`setup.ps1`/`setup.sh`) e o caminho manual — os dois executam exatamente os mesmos comandos documentados na raiz do [`README.md`](../README.md#como-rodar-o-projeto).
+Guia para preparar o `clinic-management` em uma máquina nova (Windows, macOS ou Linux). Cobre o caminho automatizado (`setup.ps1`/`setup.sh`) e o caminho manual — os dois executam exatamente os mesmos comandos documentados na raiz do [`README.md`](../../README.md#como-rodar-o-projeto).
 
 ## Pré-requisitos
 
@@ -113,6 +113,6 @@ docker rm -f clinic-mgmt-dev-db && docker volume rm clinic-mgmt-dev-db-data
 
 ## Referências
 
-- [`README.md`](../README.md) — visão geral do projeto e scripts npm disponíveis
-- [`../CLAUDE.md`](../CLAUDE.md) — regras arquiteturais e estado atual do projeto
-- [`src/db/README.md`](../src/db/README.md) e [`src/db/repositories/README.md`](../src/db/repositories/README.md) — detalhes de schema e testes de integração
+- [`README.md`](../../README.md) — visão geral do projeto e scripts npm disponíveis
+- [`../../CLAUDE.md`](../../CLAUDE.md) — regras arquiteturais e estado atual do projeto
+- [`src/db/README.md`](../../src/db/README.md) e [`src/db/repositories/README.md`](../../src/db/repositories/README.md) — detalhes de schema e testes de integração

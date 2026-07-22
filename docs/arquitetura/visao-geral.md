@@ -1,6 +1,6 @@
 # Arquitetura do MVP
 
-> **Status:** Aprovada em 2026-07-17, após revisão crítica. Decisões individuais (com alternativas consideradas e justificativas) em [`adr/`](adr/). Este documento é a visão consolidada.
+> **Status:** Aprovada em 2026-07-17, após revisão crítica. Decisões individuais (com alternativas consideradas e justificativas) em [`adrs/`](adrs/). Este documento é a visão consolidada.
 
 ## Premissas
 
@@ -22,7 +22,8 @@
 │          integrações externas futuras)               │
 │                                                      │
 │  Módulos de domínio:                                 │
-│  scheduling │ patients │ notifications │ auth        │
+│  scheduling │ patients │ notifications │ auth │      │
+│  evolutions                                          │
 │                                                      │
 │  Worker de jobs (pg-boss): envio/agendamento         │
 │  de mensagens WhatsApp, retries                      │
@@ -33,39 +34,40 @@
         Adapter WhatsApp ⇄ Meta Cloud API (webhook)
 ```
 
-Monólito modular: um deploy, um banco, transações ACID entre agenda ↔ sessão ↔ (futura) produção. A API REST `/api/v1` é a mesma que sistemas externos usarão quando existirem — hoje, na prática, ela serve só as mutações client-side da própria UI (leitura inicial de página vai direto ao repositório via Server Component, e a autenticação por API key para consumidores externos ainda não foi implementada; ver nota de atualização no [ADR-0004](adr/0004-api-rest-versionada.md)). Worker de jobs no mesmo processo Node (separável por configuração quando o volume justificar).
+Monólito modular: um deploy, um banco, transações ACID entre agenda ↔ sessão ↔ (futura) produção. A API REST `/api/v1` é a mesma que sistemas externos usarão quando existirem — hoje, na prática, ela serve só as mutações client-side da própria UI (leitura inicial de página vai direto ao repositório via Server Component, e a autenticação por API key para consumidores externos ainda não foi implementada; ver nota de atualização no [ADR-0004](adrs/0004-api-rest-versionada.md)). Worker de jobs no mesmo processo Node (separável por configuração quando o volume justificar).
 
 ## Componentes e decisões
 
 | Componente | Decisão | ADR |
 |---|---|---|
-| Organização | Monólito modular em TypeScript (Next.js) | [0001](adr/0001-monolito-modular-typescript-nextjs.md) |
-| Banco de dados | PostgreSQL; conflito de sala via exclusion constraint | [0002](adr/0002-postgresql-exclusion-constraint.md) |
-| ORM | Drizzle | [0003](adr/0003-drizzle-orm.md) |
-| API | REST versionada `/api/v1`, UUIDs públicos | [0004](adr/0004-api-rest-versionada.md) |
-| Frontend | PWA responsiva (sem app nativo) | [0005](adr/0005-pwa-responsiva.md) |
-| Autenticação | Better Auth self-hosted, isolada atrás de interface própria | [0006](adr/0006-better-auth.md) |
-| Multi-tenancy | Shared schema + `clinic_id` + repositórios tenant-scoped; RLS antes da 2ª clínica | [0007](adr/0007-multi-tenancy.md) |
-| Infra/deploy | Railway: processo persistente + Postgres gerenciado; pg-boss | [0008](adr/0008-infraestrutura-railway.md) |
-| Notificações | Módulo com outbox persistido + adapters de canal (WhatsApp Cloud API, fallback manual) | [0009](adr/0009-notificacoes-outbox-adapters.md) |
-| Auditoria | `audit_log` na camada de serviço; sessões imutáveis (transições, nunca delete) | [0010](adr/0010-auditoria-e-imutabilidade.md) |
-| Backup | Dump noturno para storage externo + teste periódico de restore | [0011](adr/0011-backup-e-recuperacao.md) |
-| Observabilidade | pino + Sentry + uptime com health do worker; entregabilidade como dado de produto | [0012](adr/0012-observabilidade-minima.md) |
+| Organização | Monólito modular em TypeScript (Next.js) | [0001](adrs/0001-monolito-modular-typescript-nextjs.md) |
+| Banco de dados | PostgreSQL; conflito de sala e de profissional validados na aplicação via transação `SERIALIZABLE` (não por exclusion constraint — ver nota abaixo) | [0002](adrs/0002-postgresql-exclusion-constraint.md), [0013](adrs/0013-capacidade-sala-validacao-aplicacao.md), [0015](adrs/0015-modelo-participacao-session-attendees.md) |
+| ORM | Drizzle | [0003](adrs/0003-drizzle-orm.md) |
+| API | REST versionada `/api/v1`, UUIDs públicos | [0004](adrs/0004-api-rest-versionada.md) |
+| Frontend | PWA responsiva (sem app nativo) | [0005](adrs/0005-pwa-responsiva.md) |
+| Autenticação | Better Auth self-hosted, isolada atrás de interface própria | [0006](adrs/0006-better-auth.md) |
+| Multi-tenancy | Shared schema + `clinic_id` + repositórios tenant-scoped; RLS antes da 2ª clínica | [0007](adrs/0007-multi-tenancy.md) |
+| Infra/deploy | Railway: processo persistente + Postgres gerenciado; pg-boss | [0008](adrs/0008-infraestrutura-railway.md) |
+| Notificações | Módulo com outbox persistido + adapters de canal (WhatsApp Cloud API, fallback manual) | [0009](adrs/0009-notificacoes-outbox-adapters.md) |
+| Auditoria | `audit_log` na camada de serviço; sessões imutáveis (transições, nunca delete) | [0010](adrs/0010-auditoria-e-imutabilidade.md) |
+| Backup | Dump noturno para storage externo + teste periódico de restore | [0011](adrs/0011-backup-e-recuperacao.md) |
+| Observabilidade | pino + Sentry + uptime com health do worker; entregabilidade como dado de produto | [0012](adrs/0012-observabilidade-minima.md) |
+
+> **Nota sobre conflito de sala/profissional:** o ADR-0002 propôs originalmente uma exclusion constraint (`EXCLUDE USING gist`) no banco. O ADR-0013 substituiu esse mecanismo por validação na camada de aplicação (transação `SERIALIZABLE`), e o ADR-0015 corrigiu o que exatamente é validado (participantes de uma turma, não sessões sobrepostas). A escolha de PostgreSQL continua válida — só o mecanismo de garantia mudou. Ver os três ADRs para o histórico completo.
 
 ## Módulos de domínio
 
 A lógica de negócio vive em módulos de serviço puros, sem imports do Next.js. Rotas HTTP são cascas finas.
 
-- **`scheduling`** — agenda, sessões, salas/espaços, transições de status (agendada → confirmada → realizada/falta/cancelada). Regra central: conflito de sala garantido pelo banco.
+- **`scheduling`** — agenda, sessões (turma: 1 profissional, 1 sala, 1 horário), participantes (`session_attendees`, 1..N pacientes por sessão), transições de status por participante (agendada → confirmada → realizada/falta/cancelada). Regra central: conflito de sala e de profissional validado na aplicação, em transação `SERIALIZABLE` (ADR-0013/0015) — não pelo banco via constraint.
 - **`patients`** — cadastro, identidade estável (UUID público), vínculo com fisioterapeuta responsável.
 - **`notifications`** — outbox de notificações, templates de confirmação, adapters de canal, processamento via worker, status de entrega (alimenta KPI de taxa de confirmação).
 - **`auth`** — wrapper próprio sobre Better Auth (`getSessionUser()` etc.); papéis: `fisioterapeuta`, `gestora`.
+- **`evolutions`** — evolução clínica mínima por atendimento realizado (nota de texto livre, autor, histórico cronológico por paciente), antecipada da fase 3 do PRD (ADR-0019).
 
 Módulos futuros (fases 2–5): `billing`, `records`, `insurance`. Ver "Crescimento" abaixo.
 
-## Estrutura de repositório planejada
-
-Quando o scaffolding for criado, seguir esta organização (nomes indicativos):
+## Estrutura de repositório atual
 
 ```
 src/
@@ -75,10 +77,11 @@ src/
     patients/
     notifications/
     auth/
-  db/                   # schema Drizzle, migrações SQL, repositórios tenant-scoped
-  jobs/                 # definições pg-boss (confirmações, retries)
+    evolutions/
+  db/                   # schema Drizzle, migrações SQL, repositórios tenant-scoped (ver src/db/README.md)
+  jobs/                 # definições pg-boss (confirmações, retries) — ainda vazio, ver src/jobs/README.md
   lib/                  # utilitários transversais (logger, config)
-docs/                   # PRD, arquitetura, ADRs
+docs/                   # produto, frontend, infraestrutura, arquitetura/ADRs — ver docs/README.md
 ```
 
 ## Regras transversais

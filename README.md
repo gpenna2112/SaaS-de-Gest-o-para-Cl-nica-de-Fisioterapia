@@ -30,7 +30,7 @@ Em uma máquina nova, o caminho mais rápido é o script de setup — ele checa 
 ./setup.sh
 ```
 
-Guia completo (incluindo o passo a passo manual equivalente e solução de problemas) em [`docs/SETUP.md`](docs/SETUP.md).
+Guia completo (incluindo o passo a passo manual equivalente e solução de problemas) em [`docs/infraestrutura/ambiente-local.md`](docs/infraestrutura/ambiente-local.md).
 
 ### Passo a passo manual
 
@@ -117,13 +117,15 @@ Agenda unificada onde **a sala é o recurso escasso** (4 fisioterapeutas ÷ 3 es
 | Notificações | Módulo com outbox persistido + adapters de canal (WhatsApp Cloud API oficial; fallback manual `wa.me`) |
 | Deploy | Railway (processo Node persistente + Postgres no mesmo projeto) |
 
-O racional completo de cada decisão está em [`docs/adr/`](docs/adr/).
+O racional completo de cada decisão está em [`docs/arquitetura/adrs/`](docs/arquitetura/adrs/).
 
 ## Documentação
 
-- [`docs/prd.md`](docs/prd.md) — Documento de requisitos do produto (PRD v1.0)
-- [`docs/architecture.md`](docs/architecture.md) — Arquitetura consolidada do MVP
-- [`docs/adr/`](docs/adr/) — Architecture Decision Records (uma decisão por arquivo)
+Índice completo em [`docs/README.md`](docs/README.md). Atalhos:
+
+- [`docs/produto/prd.md`](docs/produto/prd.md) — Documento de requisitos do produto (PRD v1.0)
+- [`docs/arquitetura/visao-geral.md`](docs/arquitetura/visao-geral.md) — Arquitetura consolidada do MVP
+- [`docs/arquitetura/adrs/`](docs/arquitetura/adrs/) — Architecture Decision Records (uma decisão por arquivo)
 - [`CLAUDE.md`](CLAUDE.md) — Guia para agentes de IA trabalhando neste repositório
 
 ## Roadmap (resumo)
@@ -134,4 +136,4 @@ O racional completo de cada decisão está em [`docs/adr/`](docs/adr/).
 4. **Mensalidades do Pilates**
 5. **Convênios** — Guias (10 sessões), faturamento TISS
 
-Detalhes e justificativa do sequenciamento no [PRD, §6](docs/prd.md).
+Detalhes e justificativa do sequenciamento no [PRD, §6](docs/produto/prd.md).

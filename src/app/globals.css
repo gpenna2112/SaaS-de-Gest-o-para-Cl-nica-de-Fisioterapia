@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* Marca Espaço Fisio — aliases exatos (pixel-perfect), ver docs/ui/DESIGN_SYSTEM.md §5 */
+  /* Marca Espaço Fisio — aliases exatos (pixel-perfect), ver docs/frontend/design-system.md §5 */
   --color-coral-brand: #de9a99;
   --color-teal-brand: #87bfb8;
 
