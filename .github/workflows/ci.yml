@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Não sensíveis, só para satisfazer o formato exigido por src/lib/env.ts
+  # (zod) — nenhum destes valores é usado para acessar sistemas reais.
+  NODE_ENV: test
+  BETTER_AUTH_SECRET: ci-github-actions-dummy-secret-not-real-value
+  BETTER_AUTH_URL: http://localhost:3000
+
+jobs:
+  # typecheck/lint/unit/build não tocam um Postgres real — o build só
+  # exige que DATABASE_URL tenha formato de URL válido (src/lib/env.ts),
+  # nunca chega a conectar (rotas de app router são todas dinâmicas, ver
+  # README). Roda em paralelo com o job `integration` para reduzir o tempo
+  # total do workflow.
+  checks:
+    name: typecheck, lint, unit, build
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://user:password@localhost:5432/clinic_management_ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Histórico completo: `git diff --check` precisa comparar contra
+          # o SHA base do PR (ou o commit anterior no push), não só o commit atual.
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: git diff --check (intervalo do PR ou do push)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.event.after }}"
+            # Push inicial de uma branch nova: `before` vem como 40 zeros,
+            # não é um commit válido — compara contra a árvore vazia do git.
+            if [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+              BASE="$(git hash-object -t tree /dev/null)"
+            fi
+          fi
+          git diff --check "$BASE" "$HEAD"
+
+  # Testes de integração exigem Postgres real (SERIALIZABLE/SSI genuíno —
+  # ver src/db/repositories/README.md). Roda em paralelo com `checks`.
+  integration:
+    name: integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: clinic_management_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/clinic_management_ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply domain migrations
+        run: npm run db:migrate
+
+      - name: Apply Better Auth migrations
+        run: npm run auth:db:migrate
+
+      - name: Integration tests
+        run: npm run test:integration
