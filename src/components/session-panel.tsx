@@ -16,6 +16,7 @@ import {
   patch as apiPatch,
   post as apiPost,
 } from "@/lib/api-client";
+import { EVOLUTION_CONTENT_MAX_LENGTH } from "@/lib/validation/evolution";
 import {
   addMinutesToTime,
   combineDateAndTimeInSaoPaulo,
@@ -170,9 +171,13 @@ function EvolutionEditor({
                 setSaved(false);
               }}
               rows={3}
+              maxLength={EVOLUTION_CONTENT_MAX_LENGTH}
               placeholder="Como foi o atendimento..."
               className="rounded-md border border-input-border bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
             />
+            <p className="text-right text-[10px] text-muted-foreground">
+              {content.length}/{EVOLUTION_CONTENT_MAX_LENGTH}
+            </p>
             {error ? <p className="text-xs text-danger">{error}</p> : null}
             {saved ? <p className="text-xs text-primary">Salvo.</p> : null}
             <Button

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { UnauthenticatedError } from "@/modules/auth/authorization";
 import { EvolutionAlreadyExistsError } from "@/db/repositories/evolutions-repository.errors";
+import { EVOLUTION_CONTENT_MAX_LENGTH } from "@/lib/validation/evolution";
 
 vi.mock("@/modules/auth/session", () => ({
   requireSessionUser: vi.fn(),
@@ -98,6 +99,30 @@ describe("POST /api/v1/session-attendees/[attendeeId]/evolution", () => {
     const response = await callPost({ content: "" });
 
     expect(response.status).toBe(400);
+  });
+
+  it("aceita exatamente o limite de caracteres e retorna 201", async () => {
+    vi.mocked(requireSessionUser).mockResolvedValue(sessionUser);
+    const content = "a".repeat(EVOLUTION_CONTENT_MAX_LENGTH);
+    const getAttendee = vi.fn().mockResolvedValue({ id: ATTENDEE_ID, patientId: "patient-1", status: "realizada" });
+    vi.mocked(createSchedulingRepository).mockReturnValue({ getAttendee } as never);
+    const createEvolution = vi.fn().mockResolvedValue({ id: "evo-1", content });
+    vi.mocked(createEvolutionsRepository).mockReturnValue({ createEvolution } as never);
+
+    const response = await callPost({ content });
+
+    expect(response.status).toBe(201);
+  });
+
+  it("retorna 400 com mensagem de validação quando content excede o limite em 1 caractere", async () => {
+    vi.mocked(requireSessionUser).mockResolvedValue(sessionUser);
+    const content = "a".repeat(EVOLUTION_CONTENT_MAX_LENGTH + 1);
+
+    const response = await callPost({ content });
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.details?.[0]?.message).toContain(`${EVOLUTION_CONTENT_MAX_LENGTH} caracteres`);
   });
 
   it("retorna 401 quando não há sessão", async () => {

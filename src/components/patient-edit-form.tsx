@@ -137,7 +137,7 @@ export function PatientEditForm({
         />
         {formError ? <p className="text-sm text-danger">{formError}</p> : null}
         <div className="flex items-center gap-4">
-          <Button type="submit" disabled={isSavingFields}>
+          <Button type="submit" disabled={isSavingFields || isTogglingActive}>
             {isSavingFields ? "Salvando..." : "Salvar alterações"}
           </Button>
           <Link href="/pacientes" className="text-sm text-muted-foreground hover:text-foreground">
@@ -150,7 +150,7 @@ export function PatientEditForm({
         <Button
           type="button"
           variant={active ? "danger" : "secondary"}
-          disabled={isTogglingActive}
+          disabled={isTogglingActive || isSavingFields}
           onClick={() => (active ? setConfirmDeactivateOpen(true) : handleReactivate())}
         >
           {isTogglingActive ? "Aguarde..." : active ? "Desativar paciente" : "Reativar paciente"}

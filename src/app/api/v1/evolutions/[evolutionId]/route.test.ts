@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { UnauthenticatedError } from "@/modules/auth/authorization";
 import { NotEvolutionAuthorError } from "@/db/repositories/evolutions-repository.errors";
+import { EVOLUTION_CONTENT_MAX_LENGTH } from "@/lib/validation/evolution";
 
 vi.mock("@/modules/auth/session", () => ({
   requireSessionUser: vi.fn(),
@@ -71,6 +72,28 @@ describe("PATCH /api/v1/evolutions/[evolutionId]", () => {
     const response = await callPatch({ content: "" });
 
     expect(response.status).toBe(400);
+  });
+
+  it("aceita exatamente o limite de caracteres e retorna 200", async () => {
+    vi.mocked(requireSessionUser).mockResolvedValue(sessionUser);
+    const content = "a".repeat(EVOLUTION_CONTENT_MAX_LENGTH);
+    const updateEvolution = vi.fn().mockResolvedValue({ id: EVOLUTION_ID, content });
+    vi.mocked(createEvolutionsRepository).mockReturnValue({ updateEvolution } as never);
+
+    const response = await callPatch({ content });
+
+    expect(response.status).toBe(200);
+  });
+
+  it("retorna 400 com mensagem de validação quando content excede o limite em 1 caractere", async () => {
+    vi.mocked(requireSessionUser).mockResolvedValue(sessionUser);
+    const content = "a".repeat(EVOLUTION_CONTENT_MAX_LENGTH + 1);
+
+    const response = await callPatch({ content });
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.details?.[0]?.message).toContain(`${EVOLUTION_CONTENT_MAX_LENGTH} caracteres`);
   });
 
   it("retorna 401 quando não há sessão", async () => {
