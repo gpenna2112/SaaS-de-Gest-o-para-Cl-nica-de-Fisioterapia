@@ -60,20 +60,21 @@ function UserBlock({
   onLogout: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onLogout}
-      disabled={isPending}
-      className="flex items-center gap-2.5 rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-left transition-colors duration-150 hover:bg-muted"
-    >
+    <div className="flex items-center gap-2.5 rounded-xl border border-border bg-muted/50 px-3 py-2.5">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">
         {initials(userName)}
       </span>
-      <span className="flex min-w-0 flex-col">
-        <span className="truncate text-sm font-semibold text-foreground">{userName}</span>
-        <span className="text-xs text-muted-foreground">{isPending ? "Saindo…" : "Sair"}</span>
-      </span>
-    </button>
+      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{userName}</span>
+      {/* Só "Sair" é clicável — nome/avatar são só exibição, para não disparar logout sem querer. */}
+      <button
+        type="button"
+        onClick={onLogout}
+        disabled={isPending}
+        className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {isPending ? "Saindo…" : "Sair"}
+      </button>
+    </div>
   );
 }
 
