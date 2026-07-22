@@ -1,8 +1,23 @@
 import { and, eq } from "drizzle-orm";
+import postgres from "postgres";
 import { writeAuditLog, type Actor } from "../audit-log";
 import type { DbClient, QueryExecutor, Tx } from "../client";
 import { rooms } from "../schema";
 import { DuplicateRoomNameError, RoomRecordNotFoundError } from "./rooms-repository.errors";
+
+const ROOMS_CLINIC_NAME_UNIQUE_CONSTRAINT = "rooms_clinic_name_unique";
+
+/**
+ * `assertNameAvailable` faz um pré-check sob isolamento padrão
+ * (READ COMMITTED), que não impede duas requisições concorrentes de
+ * passarem no pré-check antes de qualquer commit. Este guard é o
+ * backstop: converte a violação real de constraint do Postgres no mesmo
+ * erro de domínio que o pré-check já lançaria, em vez de deixar o erro
+ * cru do driver escapar para `error-response.ts`.
+ */
+function isUniqueViolation(error: unknown, constraintName: string): boolean {
+  return error instanceof postgres.PostgresError && error.code === "23505" && error.constraint_name === constraintName;
+}
 
 export type { Actor };
 export type Room = typeof rooms.$inferSelect;
@@ -84,10 +99,18 @@ async function createRoomCore(
 ): Promise<Room> {
   await assertNameAvailable(executor, clinicId, input.name);
 
-  const [inserted] = await executor
-    .insert(rooms)
-    .values({ clinicId, name: input.name, type: input.type, capacity: input.capacity })
-    .returning();
+  let inserted;
+  try {
+    [inserted] = await executor
+      .insert(rooms)
+      .values({ clinicId, name: input.name, type: input.type, capacity: input.capacity })
+      .returning();
+  } catch (error) {
+    if (isUniqueViolation(error, ROOMS_CLINIC_NAME_UNIQUE_CONSTRAINT)) {
+      throw new DuplicateRoomNameError(input.name);
+    }
+    throw error;
+  }
   const room = assertRow(inserted, "Insert de sala não retornou linha");
 
   await writeAuditLog(executor, clinicId, actor, "room.created", "room", room.id, null, roomAuditSnapshot(room));
@@ -110,15 +133,23 @@ async function updateRoomCore(
     await assertNameAvailable(executor, clinicId, input.name, roomId);
   }
 
-  const [updatedRow] = await executor
-    .update(rooms)
-    .set({
-      name: input.name ?? current.name,
-      type: input.type ?? current.type,
-      capacity: input.capacity ?? current.capacity,
-    })
-    .where(and(eq(rooms.id, roomId), eq(rooms.clinicId, clinicId)))
-    .returning();
+  let updatedRow;
+  try {
+    [updatedRow] = await executor
+      .update(rooms)
+      .set({
+        name: input.name ?? current.name,
+        type: input.type ?? current.type,
+        capacity: input.capacity ?? current.capacity,
+      })
+      .where(and(eq(rooms.id, roomId), eq(rooms.clinicId, clinicId)))
+      .returning();
+  } catch (error) {
+    if (isUniqueViolation(error, ROOMS_CLINIC_NAME_UNIQUE_CONSTRAINT)) {
+      throw new DuplicateRoomNameError(input.name ?? current.name);
+    }
+    throw error;
+  }
   const updated = assertRow(updatedRow, "Update de sala não retornou linha");
 
   await writeAuditLog(

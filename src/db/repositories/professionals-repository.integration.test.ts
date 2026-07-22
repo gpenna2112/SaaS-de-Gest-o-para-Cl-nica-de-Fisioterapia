@@ -174,6 +174,27 @@ describe("ProfessionalsRepository", () => {
     await expect(otherRepo.createProfessional({ name: "B", email, role: "fisioterapeuta" }, actor)).resolves.toBeDefined();
   });
 
+  it("duas criações concorrentes com o mesmo e-mail: só uma sucede, a outra recebe DuplicateProfessionalEmailError", async () => {
+    const repo = createProfessionalsRepository(db, fixture.clinicId);
+    const actor = { type: "professional" as const, professionalId: fixture.actorProfessionalId };
+    const suffix = randomUUID();
+    const email = `race-${suffix}@test.local`;
+
+    const results = await Promise.allSettled([
+      repo.createProfessional({ name: "Concorrente A", email, role: "fisioterapeuta" }, actor),
+      repo.createProfessional({ name: "Concorrente B", email, role: "fisioterapeuta" }, actor),
+    ]);
+
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    const rejected = results.filter((r) => r.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(DuplicateProfessionalEmailError);
+
+    const rows = await db.select().from(professionals).where(eq(professionals.email, email));
+    expect(rows).toHaveLength(1);
+  });
+
   it("updateProfessional atualiza campos e grava audit_log com before/after", async () => {
     const repo = createProfessionalsRepository(db, fixture.clinicId);
     const actor = { type: "professional" as const, professionalId: fixture.actorProfessionalId };

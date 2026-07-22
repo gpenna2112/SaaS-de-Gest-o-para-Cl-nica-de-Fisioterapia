@@ -163,6 +163,27 @@ describe("RoomsRepository", () => {
     );
   });
 
+  it("duas criações concorrentes com o mesmo nome: só uma sucede, a outra recebe DuplicateRoomNameError", async () => {
+    const repo = createRoomsRepository(db, fixture.clinicId);
+    const actor = { type: "professional" as const, professionalId: fixture.actorProfessionalId };
+    const suffix = randomUUID();
+    const name = `Sala Race ${suffix}`;
+
+    const results = await Promise.allSettled([
+      repo.createRoom({ name, type: "individual", capacity: 1 }, actor),
+      repo.createRoom({ name, type: "individual", capacity: 1 }, actor),
+    ]);
+
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    const rejected = results.filter((r) => r.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(DuplicateRoomNameError);
+
+    const rowsInDb = await db.select().from(rooms).where(eq(rooms.name, name));
+    expect(rowsInDb).toHaveLength(1);
+  });
+
   it("updateRoom atualiza capacidade e grava audit_log com before/after", async () => {
     const repo = createRoomsRepository(db, fixture.clinicId);
     const actor = { type: "professional" as const, professionalId: fixture.actorProfessionalId };

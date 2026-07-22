@@ -1,8 +1,23 @@
 import { and, eq } from "drizzle-orm";
+import postgres from "postgres";
 import { writeAuditLog, type Actor } from "../audit-log";
 import type { DbClient, QueryExecutor, Tx } from "../client";
 import { professionals } from "../schema";
 import { DuplicateProfessionalEmailError, ProfessionalRecordNotFoundError } from "./professionals-repository.errors";
+
+const PROFESSIONALS_CLINIC_EMAIL_UNIQUE_CONSTRAINT = "professionals_clinic_email_unique";
+
+/**
+ * `assertEmailAvailable` faz um pré-check sob isolamento padrão
+ * (READ COMMITTED), que não impede duas requisições concorrentes de
+ * passarem no pré-check antes de qualquer commit. Este guard é o
+ * backstop: converte a violação real de constraint do Postgres no mesmo
+ * erro de domínio que o pré-check já lançaria, em vez de deixar o erro
+ * cru do driver escapar para `error-response.ts`.
+ */
+function isUniqueViolation(error: unknown, constraintName: string): boolean {
+  return error instanceof postgres.PostgresError && error.code === "23505" && error.constraint_name === constraintName;
+}
 
 export type { Actor };
 export type Professional = typeof professionals.$inferSelect;
@@ -92,10 +107,18 @@ async function createProfessionalCore(
 ): Promise<Professional> {
   await assertEmailAvailable(executor, clinicId, input.email);
 
-  const [inserted] = await executor
-    .insert(professionals)
-    .values({ clinicId, name: input.name, email: input.email, role: input.role })
-    .returning();
+  let inserted;
+  try {
+    [inserted] = await executor
+      .insert(professionals)
+      .values({ clinicId, name: input.name, email: input.email, role: input.role })
+      .returning();
+  } catch (error) {
+    if (isUniqueViolation(error, PROFESSIONALS_CLINIC_EMAIL_UNIQUE_CONSTRAINT)) {
+      throw new DuplicateProfessionalEmailError(input.email);
+    }
+    throw error;
+  }
   const professional = assertRow(inserted, "Insert de profissional não retornou linha");
 
   await writeAuditLog(
@@ -127,15 +150,23 @@ async function updateProfessionalCore(
     await assertEmailAvailable(executor, clinicId, input.email, professionalId);
   }
 
-  const [updatedRow] = await executor
-    .update(professionals)
-    .set({
-      name: input.name ?? current.name,
-      email: input.email ?? current.email,
-      role: input.role ?? current.role,
-    })
-    .where(and(eq(professionals.id, professionalId), eq(professionals.clinicId, clinicId)))
-    .returning();
+  let updatedRow;
+  try {
+    [updatedRow] = await executor
+      .update(professionals)
+      .set({
+        name: input.name ?? current.name,
+        email: input.email ?? current.email,
+        role: input.role ?? current.role,
+      })
+      .where(and(eq(professionals.id, professionalId), eq(professionals.clinicId, clinicId)))
+      .returning();
+  } catch (error) {
+    if (isUniqueViolation(error, PROFESSIONALS_CLINIC_EMAIL_UNIQUE_CONSTRAINT)) {
+      throw new DuplicateProfessionalEmailError(input.email ?? current.email);
+    }
+    throw error;
+  }
   const updated = assertRow(updatedRow, "Update de profissional não retornou linha");
 
   await writeAuditLog(
