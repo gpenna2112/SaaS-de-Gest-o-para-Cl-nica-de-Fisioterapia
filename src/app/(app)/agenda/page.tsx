@@ -59,7 +59,7 @@ export default async function AgendaPage({
       date={date}
       rooms={rooms.map((room) => ({ id: room.id, name: room.name, type: room.type, capacity: room.capacity }))}
       sessions={sessions}
-      slotMinutes={clinic?.defaultSessionDurationMinutes ?? 50}
+      slotMinutes={clinic?.defaultSessionDurationMinutes ?? 60}
       professionals={professionals.map((professional) => ({ id: professional.id, name: professional.name }))}
       patients={activePatients.map((patient) => ({ id: patient.id, name: patient.name }))}
       cancelledCount={cancelledAttendeesCount}
