@@ -38,13 +38,6 @@ export interface AgendaRoom {
   capacity: number;
 }
 
-function WhatsAppIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
-      <path d="M12.04 2c-5.46 0-9.9 4.44-9.9 9.9 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.9-4.44 9.9-9.9 0-2.64-1.03-5.12-2.9-6.99A9.82 9.82 0 0 0 12.04 2Zm5.8 14.13c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.12.11-1.8-.11-.42-.13-.96-.31-1.66-.6-2.92-1.26-4.83-4.2-4.98-4.4-.15-.2-1.2-1.6-1.2-3.05s.76-2.16 1.03-2.46c.27-.3.58-.37.78-.37.2 0 .39 0 .56.01.18.01.42-.07.65.5.24.58.82 2 .89 2.14.07.15.12.32.02.52-.1.2-.15.32-.3.5-.15.18-.31.4-.44.53-.15.15-.3.31-.13.6.17.3.77 1.27 1.66 2.06 1.14 1.02 2.1 1.34 2.4 1.49.3.15.47.13.65-.08.18-.2.76-.88.96-1.18.2-.3.4-.25.66-.15.27.1 1.7.8 2 .95.3.15.5.22.57.35.07.13.07.75-.17 1.43Z" />
-    </svg>
-  );
-}
 function PeopleIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3" aria-hidden="true">
@@ -64,7 +57,6 @@ export function AgendaView({
   slotMinutes,
   professionals,
   patients,
-  patientPhoneById,
   cancelledCount,
   currentProfessionalId,
 }: {
@@ -74,7 +66,6 @@ export function AgendaView({
   slotMinutes: number;
   professionals: ProfessionalOption[];
   patients: PatientOption[];
-  patientPhoneById: Record<string, string | null>;
   cancelledCount: number;
   currentProfessionalId?: string;
 }) {
@@ -263,8 +254,6 @@ export function AgendaView({
   function SessionCard({ session, compact }: { session: SessionView; compact?: boolean }) {
     const active = session.attendees.filter((attendee) => attendee.status !== "cancelada");
     const professional = professionals.find((p) => p.id === session.professionalId);
-    const singlePhone = active.length === 1 ? (patientPhoneById[active[0]?.patientId ?? ""] ?? null) : null;
-    const whatsappHref = singlePhone ? `https://wa.me/${singlePhone.replace("+", "")}` : null;
     // Aguardando confirmação (algum attendee ainda "agendada") ganha
     // destaque âmbar no bloco em si — hoje só era visível abrindo o card.
     const isPending = active.some((attendee) => attendee.status === "agendada");
@@ -316,18 +305,6 @@ export function AgendaView({
         </button>
         {!compact ? (
           <div className="flex shrink-0 flex-col gap-1 self-start">
-            {whatsappHref ? (
-              <a
-                href={whatsappHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Abrir conversa no WhatsApp"
-                aria-label="Abrir conversa no WhatsApp"
-                className="flex h-6 w-6 items-center justify-center rounded-md border border-input-border bg-background text-primary hover:bg-muted"
-              >
-                <WhatsAppIcon />
-              </a>
-            ) : null}
             <button
               type="button"
               title="Mais opções"

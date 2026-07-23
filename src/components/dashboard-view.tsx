@@ -15,17 +15,19 @@ function EmptyState({ children }: { children: React.ReactNode }) {
 export function DashboardView({
   snapshot,
   dateLabel,
+  weekdayLabel,
   date,
   greeting,
 }: {
   snapshot: DashboardSnapshot;
   dateLabel: string;
+  weekdayLabel: string;
   date: string;
   greeting: string;
 }) {
   const agendaHref = `/agenda?date=${date}`;
   return (
-    <div className="flex flex-col gap-5 pb-4">
+    <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-5 pb-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight">{greeting}</h1>
@@ -34,14 +36,17 @@ export function DashboardView({
             agendadas na clínica.
           </p>
         </div>
-        <p className="text-right text-sm font-semibold text-muted-foreground">{dateLabel}</p>
+        <div className="text-right">
+          <p className="text-sm font-semibold">{dateLabel}</p>
+          <p className="text-xs text-muted-foreground capitalize">{weekdayLabel}</p>
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <StatCard tone="primary" value={snapshot.sessionsCount} label="Sessões hoje" />
-        <StatCard tone="primary" value={snapshot.realizedCount} label="Realizadas" />
-        <StatCard tone="danger" value={snapshot.missedCount} label="Faltas" />
-        <StatCard tone="warning" value={snapshot.cancelledCount} label="Canceladas" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard tone="primary" value={snapshot.sessionsCount} label="Sessões hoje" className="w-full" />
+        <StatCard tone="primary" value={snapshot.realizedCount} label="Realizadas" className="w-full" />
+        <StatCard tone="danger" value={snapshot.missedCount} label="Faltas" className="w-full" />
+        <StatCard tone="warning" value={snapshot.cancelledCount} label="Canceladas" className="w-full" />
       </div>
 
       <Card className="flex flex-col gap-3">

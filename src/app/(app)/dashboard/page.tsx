@@ -11,7 +11,6 @@ import { getSessionUser } from "@/modules/auth/session";
 import { buildDashboardSnapshot } from "@/modules/scheduling/dashboard-view";
 import {
   dayRangeInSaoPaulo,
-  formatDateLongPtBr,
   minutesSinceMidnightSaoPaulo,
   todayInSaoPaulo,
 } from "@/modules/scheduling/day-range";
@@ -47,7 +46,7 @@ export default async function DashboardPage() {
 
   const patientNameById = new Map(allPatients.map((patient) => [patient.id, patient.name]));
   const sessions = toSessionViews(sessionsWithAttendees, patientNameById);
-  const slotMinutes = clinic?.defaultSessionDurationMinutes ?? 50;
+  const slotMinutes = clinic?.defaultSessionDurationMinutes ?? 60;
 
   const snapshot = buildDashboardSnapshot({
     sessions,
@@ -64,10 +63,23 @@ export default async function DashboardPage() {
   const firstName = sessionUser.name.trim().split(/\s+/)[0];
   const greeting = `${period}, ${firstName}!`;
 
+  const referenceInstant = new Date(`${date}T12:00:00-03:00`);
+  const dateLabel = new Intl.DateTimeFormat("pt-BR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "America/Sao_Paulo",
+  }).format(referenceInstant);
+  const weekdayLabel = new Intl.DateTimeFormat("pt-BR", {
+    weekday: "long",
+    timeZone: "America/Sao_Paulo",
+  }).format(referenceInstant);
+
   return (
     <DashboardView
       snapshot={snapshot}
-      dateLabel={formatDateLongPtBr(date)}
+      dateLabel={dateLabel}
+      weekdayLabel={weekdayLabel}
       date={date}
       greeting={greeting}
     />

@@ -18,6 +18,11 @@ export interface RoomItem {
   active: boolean;
 }
 
+const ROOM_TYPE_LABELS: Record<RoomItem["type"], string> = {
+  individual: "Individual",
+  pilates: "Pilates",
+};
+
 function NewRoomForm({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -168,6 +173,7 @@ function RoomRow({ room, onChanged }: { room: RoomItem; onChanged: () => void })
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <span className="font-medium">{room.name}</span>
+          <span className="text-xs text-muted-foreground">{ROOM_TYPE_LABELS[room.type]}</span>
           {!room.active ? <StatusBadge tone="neutral">Inativa</StatusBadge> : null}
         </div>
         <div className="flex items-center gap-2">

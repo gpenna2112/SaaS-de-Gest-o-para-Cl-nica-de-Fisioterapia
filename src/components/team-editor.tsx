@@ -23,6 +23,11 @@ const ROLE_LABELS: Record<string, string> = {
   gestora: "Gestora",
 };
 
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
+}
+
 function NewProfessionalForm({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -160,7 +165,15 @@ function ProfessionalRow({ professional, onChanged }: { professional: Profession
   return (
     <li className="flex flex-col gap-1 px-4 py-3">
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
+          <span
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12.5px] font-bold ${
+              professional.active ? "bg-teal-100 text-teal-800" : "bg-muted text-muted-foreground"
+            }`}
+            aria-hidden="true"
+          >
+            {initials(professional.name)}
+          </span>
           <span className="font-medium">{professional.name}</span>
           {!professional.active ? <StatusBadge tone="neutral">Inativo</StatusBadge> : null}
         </div>
