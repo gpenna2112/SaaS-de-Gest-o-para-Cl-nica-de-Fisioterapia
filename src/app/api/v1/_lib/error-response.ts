@@ -24,10 +24,15 @@ import {
 import {
   DuplicateProfessionalEmailError,
   LastGestoraError,
+  ProfessionalHasRelatedRecordsError,
   ProfessionalRecordNotFoundError,
   ProfessionalsWriteConflictError,
 } from "@/db/repositories/professionals-repository.errors";
-import { DuplicateRoomNameError, RoomRecordNotFoundError } from "@/db/repositories/rooms-repository.errors";
+import {
+  DuplicateRoomNameError,
+  RoomHasRelatedRecordsError,
+  RoomRecordNotFoundError,
+} from "@/db/repositories/rooms-repository.errors";
 import {
   AttendeeNotRealizadaError,
   AttendeeRecordNotFoundError,
@@ -113,7 +118,9 @@ export function errorResponse(error: unknown): NextResponse {
     error instanceof DuplicateRoomNameError ||
     error instanceof EvolutionAlreadyExistsError ||
     error instanceof LastGestoraError ||
-    error instanceof ProfessionalsWriteConflictError
+    error instanceof ProfessionalsWriteConflictError ||
+    error instanceof ProfessionalHasRelatedRecordsError ||
+    error instanceof RoomHasRelatedRecordsError
   ) {
     return NextResponse.json({ error: error.message }, { status: 409 });
   }

@@ -7,7 +7,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { getApiErrorMessage, patch, post } from "@/lib/api-client";
+import { del, getApiErrorMessage, patch, post } from "@/lib/api-client";
 import { createProfessionalSchema } from "@/lib/validation/professional";
 
 export interface ProfessionalItem {
@@ -96,6 +96,8 @@ function ProfessionalRow({ professional, onChanged }: { professional: Profession
   const [isSaving, startSaving] = useTransition();
   const [isToggling, setIsToggling] = useState(false);
   const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   function handleSave() {
     setError(null);
@@ -137,6 +139,23 @@ function ProfessionalRow({ professional, onChanged }: { professional: Profession
       throw err;
     } finally {
       setIsToggling(false);
+    }
+  }
+
+  // Mesmo racional de `handleConfirmDeactivate`: sem `startTransition`, o
+  // ConfirmDialog precisa que a promise rejeite pra saber que deve
+  // permanecer aberto e mostrar o erro (ex.: profissional com sessões).
+  async function handleConfirmDelete() {
+    setError(null);
+    setIsDeleting(true);
+    try {
+      await del(`/api/v1/professionals/${professional.id}`);
+      onChanged();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Não foi possível excluir. Tente novamente."));
+      throw err;
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -191,6 +210,17 @@ function ProfessionalRow({ professional, onChanged }: { professional: Profession
           >
             {professional.active ? "Desativar" : "Reativar"}
           </Button>
+          {!professional.active ? (
+            <Button
+              type="button"
+              variant="danger"
+              disabled={isDeleting}
+              onClick={() => setConfirmDeleteOpen(true)}
+              className="min-h-8 px-3 py-1 text-xs"
+            >
+              Excluir
+            </Button>
+          ) : null}
         </div>
       </div>
       {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -202,6 +232,15 @@ function ProfessionalRow({ professional, onChanged }: { professional: Profession
         confirmLabel="Desativar"
         isConfirming={isToggling}
         onConfirm={handleConfirmDeactivate}
+      />
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title={`Excluir ${professional.name}?`}
+        description="Remove o cadastro definitivamente. Só é possível se este profissional nunca teve sessão ou paciente vinculado — caso tenha, a exclusão falha e você pode manter só desativado."
+        confirmLabel="Excluir"
+        isConfirming={isDeleting}
+        onConfirm={handleConfirmDelete}
       />
     </li>
   );

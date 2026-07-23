@@ -35,3 +35,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ro
     return errorResponse(error);
   }
 }
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ roomId: string }> }) {
+  try {
+    const sessionUser = await requireRole(request.headers, ["gestora"]);
+    const { roomId } = await params;
+    const actor = { type: "professional" as const, professionalId: sessionUser.professionalId };
+
+    const repository = createRoomsRepository(getDb(), sessionUser.clinicId);
+    const room = await repository.getRoom(roomId);
+    if (!room) {
+      return NextResponse.json({ error: "Sala não encontrada." }, { status: 404 });
+    }
+
+    await repository.deleteRoom(roomId, actor);
+
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
