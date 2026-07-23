@@ -12,6 +12,8 @@ const links = [
   { href: "/pacientes", label: "Pacientes" },
   { href: "/equipe", label: "Equipe" },
   { href: "/salas", label: "Salas" },
+  { href: "/relatorios", label: "Relatórios" },
+  { href: "/configuracoes", label: "Configurações" },
 ];
 
 function initials(name: string): string {
