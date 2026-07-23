@@ -49,6 +49,7 @@ const QUICK_ACTIONS: {
   label: string;
   title: string;
 }[] = [
+  { target: "confirmada", label: "OK", title: "Confirmar presença" },
   { target: "realizada", label: "✓", title: "Marcar como realizada" },
   { target: "falta", label: "⊘", title: "Marcar falta" },
   { target: "cancelada", label: "✕", title: "Cancelar" },
@@ -206,7 +207,7 @@ function EvolutionEditor({
 }
 
 function quickActionButtonClass(active: boolean) {
-  return `flex h-7 w-7 items-center justify-center rounded-md border text-sm ${
+  return `flex h-7 min-w-7 items-center justify-center rounded-md border px-1.5 text-sm ${
     active
       ? "border-input-border bg-muted text-foreground"
       : "border-input-border text-muted-foreground hover:bg-muted hover:text-foreground"

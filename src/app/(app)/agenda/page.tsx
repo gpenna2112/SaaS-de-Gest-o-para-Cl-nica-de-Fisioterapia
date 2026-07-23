@@ -53,7 +53,6 @@ export default async function AgendaPage({
 
   const patientNameById = new Map(allPatients.map((patient) => [patient.id, patient.name]));
   const sessions = toSessionViews(sessionsWithAttendees, patientNameById);
-  const patientPhoneById = Object.fromEntries(allPatients.map((patient) => [patient.id, patient.phone]));
 
   return (
     <AgendaView
@@ -63,7 +62,6 @@ export default async function AgendaPage({
       slotMinutes={clinic?.defaultSessionDurationMinutes ?? 50}
       professionals={professionals.map((professional) => ({ id: professional.id, name: professional.name }))}
       patients={activePatients.map((patient) => ({ id: patient.id, name: patient.name }))}
-      patientPhoneById={patientPhoneById}
       cancelledCount={cancelledAttendeesCount}
       currentProfessionalId={sessionUser.professionalId}
     />
