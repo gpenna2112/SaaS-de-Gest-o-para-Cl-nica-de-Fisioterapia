@@ -98,14 +98,30 @@ export function Nav({ userName }: { userName: string }) {
     <>
       {/* Sidebar desktop — fixa, sempre visível (mesmo breakpoint md usado no resto do app) */}
       <aside className="sticky top-0 hidden h-screen w-58 shrink-0 flex-col gap-6 border-r border-border bg-background p-4 md:flex">
-        <Image src="/espaco-fisio-logo-cropped.png" alt="Espaço Fisio" width={226} height={53} className="ml-1 h-11 w-auto" priority />
+        <Image
+          src="/espaco-fisio-logo-cropped.png"
+          alt="Espaço Fisio"
+          width={226}
+          height={53}
+          className="ml-1 h-11 w-auto"
+          unoptimized
+          priority
+        />
         <NavLinks pathname={pathname} />
         <UserBlock userName={userName} isPending={isPending} onLogout={handleLogout} />
       </aside>
 
       {/* Barra mobile — logo + botão de menu, abre o drawer */}
       <div className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-border bg-background px-4 py-3 md:hidden">
-        <Image src="/espaco-fisio-logo-cropped.png" alt="Espaço Fisio" width={179} height={42} className="h-10 w-auto" priority />
+        <Image
+          src="/espaco-fisio-logo-cropped.png"
+          alt="Espaço Fisio"
+          width={179}
+          height={42}
+          className="h-10 w-auto"
+          unoptimized
+          priority
+        />
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
@@ -125,7 +141,15 @@ export function Nav({ userName }: { userName: string }) {
           />
           <div className="fixed inset-y-0 left-0 z-50 flex w-full max-w-[260px] flex-col gap-6 bg-background p-4 shadow-xl md:hidden">
             <div className="flex items-center justify-between">
-              <Image src="/espaco-fisio-logo-cropped.png" alt="Espaço Fisio" width={179} height={42} className="h-9 w-auto" priority />
+              <Image
+                src="/espaco-fisio-logo-cropped.png"
+                alt="Espaço Fisio"
+                width={179}
+                height={42}
+                className="h-9 w-auto"
+                unoptimized
+                priority
+              />
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}

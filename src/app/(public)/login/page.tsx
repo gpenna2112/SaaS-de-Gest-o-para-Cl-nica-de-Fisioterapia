@@ -22,7 +22,15 @@ function LoginShell({ children }: { children: React.ReactNode }) {
       <div className="pointer-events-none absolute -top-44 -right-40 h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle,rgba(143,214,203,0.16)_0%,rgba(143,214,203,0)_70%)]" />
       <div className="relative hidden flex-[1.15] flex-col justify-between p-14 min-[920px]:flex">
         <div className="inline-flex w-fit items-center justify-center rounded-2xl bg-background px-6 py-4 shadow-xl">
-          <Image src="/espaco-fisio-logo-cropped.png" alt="Espaço Fisio" width={226} height={53} className="h-12 w-auto" priority />
+          <Image
+            src="/espaco-fisio-logo-cropped.png"
+            alt="Espaço Fisio"
+            width={226}
+            height={53}
+            className="h-12 w-auto"
+            unoptimized
+            priority
+          />
         </div>
         <div className="max-w-md">
           <p className="mb-3 font-mono text-xs font-bold tracking-[0.14em] text-teal-300 uppercase">Gestão de clínica</p>
@@ -40,7 +48,15 @@ function LoginShell({ children }: { children: React.ReactNode }) {
       <div className="relative flex flex-1 min-w-0 items-center justify-center p-6">
         <div className="flex w-full max-w-sm flex-col items-center gap-6">
           <div className="inline-flex items-center justify-center rounded-2xl bg-background px-6 py-4 shadow-xl min-[920px]:hidden">
-            <Image src="/espaco-fisio-logo-cropped.png" alt="Espaço Fisio" width={179} height={42} className="h-10 w-auto" priority />
+            <Image
+              src="/espaco-fisio-logo-cropped.png"
+              alt="Espaço Fisio"
+              width={179}
+              height={42}
+              className="h-10 w-auto"
+              unoptimized
+              priority
+            />
           </div>
 
           <div className="w-full rounded-3xl bg-background p-8 shadow-2xl">{children}</div>
