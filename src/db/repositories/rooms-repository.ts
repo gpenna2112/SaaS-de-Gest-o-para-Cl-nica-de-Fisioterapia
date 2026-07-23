@@ -1,9 +1,9 @@
 import { and, eq } from "drizzle-orm";
 import { writeAuditLog, type Actor } from "../audit-log";
 import type { DbClient, QueryExecutor, Tx } from "../client";
-import { isUniqueViolation } from "../postgres-errors";
+import { isForeignKeyViolation, isUniqueViolation } from "../postgres-errors";
 import { rooms } from "../schema";
-import { DuplicateRoomNameError, RoomRecordNotFoundError } from "./rooms-repository.errors";
+import { DuplicateRoomNameError, RoomHasRelatedRecordsError, RoomRecordNotFoundError } from "./rooms-repository.errors";
 
 const ROOMS_CLINIC_NAME_UNIQUE_CONSTRAINT = "rooms_clinic_name_unique";
 
@@ -42,6 +42,7 @@ export interface RoomsRepository {
   updateRoom(roomId: string, input: UpdateRoomInput, actor: Actor, tx?: Tx): Promise<Room>;
   deactivateRoom(roomId: string, actor: Actor, tx?: Tx): Promise<Room>;
   reactivateRoom(roomId: string, actor: Actor, tx?: Tx): Promise<Room>;
+  deleteRoom(roomId: string, actor: Actor, tx?: Tx): Promise<void>;
 }
 
 function assertRow<T>(row: T | undefined, message: string): T {
@@ -190,6 +191,29 @@ async function setActiveCore(
   return updated;
 }
 
+async function deleteRoomCore(
+  executor: QueryExecutor,
+  clinicId: string,
+  roomId: string,
+  actor: Actor,
+): Promise<void> {
+  const current = await fetchRoomById(executor, clinicId, roomId);
+  if (!current) {
+    throw new RoomRecordNotFoundError(roomId);
+  }
+
+  try {
+    await executor.delete(rooms).where(and(eq(rooms.id, roomId), eq(rooms.clinicId, clinicId)));
+  } catch (error) {
+    if (isForeignKeyViolation(error)) {
+      throw new RoomHasRelatedRecordsError(roomId);
+    }
+    throw error;
+  }
+
+  await writeAuditLog(executor, clinicId, actor, "room.deleted", "room", roomId, roomAuditSnapshot(current), null);
+}
+
 export function createRoomsRepository(db: DbClient, clinicId: string): RoomsRepository {
   return {
     listRooms(filter, tx) {
@@ -232,6 +256,13 @@ export function createRoomsRepository(db: DbClient, clinicId: string): RoomsRepo
         return setActiveCore(externalTx, clinicId, roomId, actor, true);
       }
       return db.transaction((tx) => setActiveCore(tx, clinicId, roomId, actor, true));
+    },
+
+    deleteRoom(roomId, actor, externalTx) {
+      if (externalTx) {
+        return deleteRoomCore(externalTx, clinicId, roomId, actor);
+      }
+      return db.transaction((tx) => deleteRoomCore(tx, clinicId, roomId, actor));
     },
   };
 }

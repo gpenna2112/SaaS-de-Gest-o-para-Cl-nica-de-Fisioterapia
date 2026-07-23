@@ -7,7 +7,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { getApiErrorMessage, patch, post } from "@/lib/api-client";
+import { del, getApiErrorMessage, patch, post } from "@/lib/api-client";
 import { createRoomSchema } from "@/lib/validation/room";
 
 export interface RoomItem {
@@ -97,6 +97,8 @@ function RoomRow({ room, onChanged }: { room: RoomItem; onChanged: () => void })
   const [isSaving, startSaving] = useTransition();
   const [isToggling, setIsToggling] = useState(false);
   const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   function handleSave() {
     setError(null);
@@ -138,6 +140,23 @@ function RoomRow({ room, onChanged }: { room: RoomItem; onChanged: () => void })
       throw err;
     } finally {
       setIsToggling(false);
+    }
+  }
+
+  // Mesmo racional de `handleConfirmDeactivate`: sem `startTransition`, o
+  // ConfirmDialog precisa que a promise rejeite pra saber que deve
+  // permanecer aberto e mostrar o erro (ex.: sala com sessões).
+  async function handleConfirmDelete() {
+    setError(null);
+    setIsDeleting(true);
+    try {
+      await del(`/api/v1/rooms/${room.id}`);
+      onChanged();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Não foi possível excluir. Tente novamente."));
+      throw err;
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -192,6 +211,17 @@ function RoomRow({ room, onChanged }: { room: RoomItem; onChanged: () => void })
           >
             {room.active ? "Desativar" : "Reativar"}
           </Button>
+          {!room.active ? (
+            <Button
+              type="button"
+              variant="danger"
+              disabled={isDeleting}
+              onClick={() => setConfirmDeleteOpen(true)}
+              className="min-h-8 px-3 py-1 text-xs"
+            >
+              Excluir
+            </Button>
+          ) : null}
         </div>
       </div>
       {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -203,6 +233,15 @@ function RoomRow({ room, onChanged }: { room: RoomItem; onChanged: () => void })
         confirmLabel="Desativar"
         isConfirming={isToggling}
         onConfirm={handleConfirmDeactivate}
+      />
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title={`Excluir ${room.name}?`}
+        description="Remove o cadastro definitivamente. Só é possível se esta sala nunca teve sessão vinculada — caso tenha, a exclusão falha e você pode manter só desativada."
+        confirmLabel="Excluir"
+        isConfirming={isDeleting}
+        onConfirm={handleConfirmDelete}
       />
     </li>
   );

@@ -29,3 +29,13 @@ export class ProfessionalsWriteConflictError extends Error {
     this.name = "ProfessionalsWriteConflictError";
   }
 }
+
+/** Exclusão definitiva bloqueada por FK (sessões, pacientes com este profissional como responsável, etc.) — nunca apagamos histórico (ADR-0010); a via correta nesse caso é desativar. */
+export class ProfessionalHasRelatedRecordsError extends Error {
+  constructor(public readonly professionalId: string) {
+    super(
+      "Não é possível excluir: este profissional tem sessões ou pacientes vinculados. Desative em vez de excluir.",
+    );
+    this.name = "ProfessionalHasRelatedRecordsError";
+  }
+}

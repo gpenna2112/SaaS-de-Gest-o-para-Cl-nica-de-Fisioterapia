@@ -1,12 +1,13 @@
 import { and, eq } from "drizzle-orm";
 import { writeAuditLog, type Actor } from "../audit-log";
 import type { DbClient, QueryExecutor, Tx } from "../client";
-import { isUniqueViolation } from "../postgres-errors";
+import { isForeignKeyViolation, isUniqueViolation } from "../postgres-errors";
 import { professionals } from "../schema";
 import { withSerializableRetry } from "../transaction-retry";
 import {
   DuplicateProfessionalEmailError,
   LastGestoraError,
+  ProfessionalHasRelatedRecordsError,
   ProfessionalRecordNotFoundError,
   ProfessionalsWriteConflictError,
 } from "./professionals-repository.errors";
@@ -51,6 +52,7 @@ export interface ProfessionalsRepository {
   ): Promise<Professional>;
   deactivateProfessional(professionalId: string, actor: Actor, tx?: Tx): Promise<Professional>;
   reactivateProfessional(professionalId: string, actor: Actor, tx?: Tx): Promise<Professional>;
+  deleteProfessional(professionalId: string, actor: Actor, tx?: Tx): Promise<void>;
 }
 
 function assertRow<T>(row: T | undefined, message: string): T {
@@ -251,6 +253,40 @@ async function setActiveCore(
   return updated;
 }
 
+async function deleteProfessionalCore(
+  executor: QueryExecutor,
+  clinicId: string,
+  professionalId: string,
+  actor: Actor,
+): Promise<void> {
+  const current = await fetchProfessionalById(executor, clinicId, professionalId);
+  if (!current) {
+    throw new ProfessionalRecordNotFoundError(professionalId);
+  }
+
+  try {
+    await executor
+      .delete(professionals)
+      .where(and(eq(professionals.id, professionalId), eq(professionals.clinicId, clinicId)));
+  } catch (error) {
+    if (isForeignKeyViolation(error)) {
+      throw new ProfessionalHasRelatedRecordsError(professionalId);
+    }
+    throw error;
+  }
+
+  await writeAuditLog(
+    executor,
+    clinicId,
+    actor,
+    "professional.deleted",
+    "professional",
+    professionalId,
+    professionalAuditSnapshot(current),
+    null,
+  );
+}
+
 export function createProfessionalsRepository(db: DbClient, clinicId: string): ProfessionalsRepository {
   return {
     listProfessionals(filter, tx) {
@@ -311,6 +347,13 @@ export function createProfessionalsRepository(db: DbClient, clinicId: string): P
         return setActiveCore(externalTx, clinicId, professionalId, actor, true);
       }
       return db.transaction((tx) => setActiveCore(tx, clinicId, professionalId, actor, true));
+    },
+
+    deleteProfessional(professionalId, actor, externalTx) {
+      if (externalTx) {
+        return deleteProfessionalCore(externalTx, clinicId, professionalId, actor);
+      }
+      return db.transaction((tx) => deleteProfessionalCore(tx, clinicId, professionalId, actor));
     },
   };
 }

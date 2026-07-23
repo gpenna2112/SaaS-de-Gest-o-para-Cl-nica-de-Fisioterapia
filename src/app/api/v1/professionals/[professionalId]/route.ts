@@ -35,3 +35,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pr
     return errorResponse(error);
   }
 }
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ professionalId: string }> }) {
+  try {
+    const sessionUser = await requireRole(request.headers, ["gestora"]);
+    const { professionalId } = await params;
+    const actor = { type: "professional" as const, professionalId: sessionUser.professionalId };
+
+    const repository = createProfessionalsRepository(getDb(), sessionUser.clinicId);
+    const professional = await repository.getProfessional(professionalId);
+    if (!professional) {
+      return NextResponse.json({ error: "Profissional não encontrado." }, { status: 404 });
+    }
+
+    await repository.deleteProfessional(professionalId, actor);
+
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}

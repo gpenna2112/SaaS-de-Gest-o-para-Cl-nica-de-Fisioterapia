@@ -40,6 +40,10 @@ export function patch<T>(path: string, data: unknown): Promise<T> {
   return request<T>(path, { method: "PATCH", body: JSON.stringify(data) });
 }
 
+export function del<T>(path: string): Promise<T> {
+  return request<T>(path, { method: "DELETE" });
+}
+
 /**
  * Extrai a mensagem de erro (`{ error: string }`) que `error-response.ts`
  * devolve para qualquer falha mapeada (400/401/403/404/409/422/500) —
