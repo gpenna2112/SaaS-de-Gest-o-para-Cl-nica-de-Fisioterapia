@@ -1,8 +1,8 @@
 const SAO_PAULO_OFFSET = "-03:00";
 
-/** Início/fim do expediente considerado pela grade da agenda e pelo dashboard (07:00–20:00). */
+/** Início/fim do expediente considerado pela grade da agenda e pelo dashboard (07:00–22:00). */
 export const DAY_START_MINUTES = 7 * 60;
-export const DAY_END_MINUTES = 20 * 60;
+export const DAY_END_MINUTES = 22 * 60;
 
 /**
  * Minutos desde a meia-noite, na timezone da clínica — usado tanto pela
