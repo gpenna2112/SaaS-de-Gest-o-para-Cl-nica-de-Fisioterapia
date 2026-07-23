@@ -18,8 +18,9 @@ type Mode = "signin" | "signup";
  */
 function LoginShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-teal-800 via-teal-900 to-teal-950">
-      <div className="hidden flex-[1.15] flex-col justify-between p-14 min-[920px]:flex">
+    <div className="relative flex min-h-screen overflow-hidden bg-gradient-to-br from-teal-800 via-teal-900 to-teal-950">
+      <div className="pointer-events-none absolute -top-44 -right-40 h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle,rgba(143,214,203,0.16)_0%,rgba(143,214,203,0)_70%)]" />
+      <div className="relative hidden flex-[1.15] flex-col justify-between p-14 min-[920px]:flex">
         <div className="inline-flex w-fit items-center justify-center rounded-2xl bg-background px-6 py-4 shadow-xl">
           <Image src="/espaco-fisio-logo.png" alt="Espaço Fisio" width={140} height={53} className="h-9 w-auto" priority />
         </div>
@@ -36,7 +37,7 @@ function LoginShell({ children }: { children: React.ReactNode }) {
         <p className="font-mono text-xs tracking-wide text-teal-400/70">agenda · pacientes · equipe · salas</p>
       </div>
 
-      <div className="flex flex-1 min-w-0 items-center justify-center p-6">
+      <div className="relative flex flex-1 min-w-0 items-center justify-center p-6">
         <div className="flex w-full max-w-sm flex-col items-center gap-6">
           <div className="inline-flex items-center justify-center rounded-2xl bg-background px-6 py-4 shadow-xl min-[920px]:hidden">
             <Image src="/espaco-fisio-logo.png" alt="Espaço Fisio" width={112} height={42} className="h-8 w-auto" priority />

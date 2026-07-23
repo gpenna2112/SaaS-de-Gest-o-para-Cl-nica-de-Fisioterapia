@@ -271,7 +271,7 @@ export function AgendaView({
 
     return (
       <div
-        className={`z-10 flex gap-1 overflow-hidden rounded-md border p-1.5 text-xs ${
+        className={`z-10 flex gap-1 overflow-hidden rounded-md border p-1.5 text-xs transition-shadow duration-150 hover:shadow-md ${
           isPending ? "border-amber-300 bg-warning" : "border-teal-300 bg-teal-50"
         } ${compact ? "h-full w-full" : "absolute inset-1"}`}
       >
@@ -365,7 +365,7 @@ export function AgendaView({
   const mobileRoom = visibleRooms.find((room) => room.id === mobileRoomId) ?? visibleRooms[0];
 
   return (
-    <div className="flex flex-col gap-4 pb-20 md:pb-4">
+    <div className="flex flex-col gap-4 pb-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-extrabold tracking-tight">Agenda</h1>
         <div className="flex gap-1 rounded-lg bg-muted p-1 text-sm font-medium">
