@@ -34,7 +34,7 @@ async function main() {
 
   const [clinic] = await db
     .insert(clinics)
-    .values({ name: "Clínica Exemplo" })
+    .values({ name: "Clínica Exemplo", defaultSessionDurationMinutes: 60 })
     .returning();
   const clinicId = clinic!.id;
 

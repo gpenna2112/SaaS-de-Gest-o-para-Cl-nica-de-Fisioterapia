@@ -47,7 +47,7 @@ export default async function DashboardPage() {
 
   const patientNameById = new Map(allPatients.map((patient) => [patient.id, patient.name]));
   const sessions = toSessionViews(sessionsWithAttendees, patientNameById);
-  const slotMinutes = clinic?.defaultSessionDurationMinutes ?? 50;
+  const slotMinutes = clinic?.defaultSessionDurationMinutes ?? 60;
 
   const snapshot = buildDashboardSnapshot({
     sessions,
